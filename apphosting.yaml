@@ -1,0 +1,42 @@
+env:
+  - variable: DATABASE_URL
+    secret: DATABASE_URL
+  - variable: SESSION_SECRET
+    secret: SESSION_SECRET
+  - variable: APPLE_PASS_CERT_B64
+    secret: APPLE_PASS_CERT_B64
+  - variable: APPLE_PASS_KEY_B64
+    secret: APPLE_PASS_KEY_B64
+  - variable: APPLE_WWDR_CERT_B64
+    secret: APPLE_WWDR_CERT_B64
+
+  - variable: APP_BASE_URL
+    value: "https://fuel-rewards--ufc-gym-fuel-rewards.us-central1.hosted.app"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: STAMP_WINDOW_DAYS
+    value: "15"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: APPLE_TEAM_ID
+    value: "2NP49AWVYH"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: APPLE_PASS_TYPE_IDENTIFIER
+    value: "pass.com.ufcgym.fuel"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: APPLE_ORGANIZATION_NAME
+    value: "UFC GYM"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: GOOGLE_WALLET_CLASS_ID
+    value: "fuel_rewards_class"
+    availability:
+      - BUILD
+      - RUNTIME
