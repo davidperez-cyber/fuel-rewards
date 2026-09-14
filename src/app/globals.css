@@ -1,0 +1,130 @@
+:root {
+  --bg: #0b0b0c;
+  --surface: #141414;
+  --border: #232323;
+  --border-soft: #1c1c1c;
+  --red: #e21c24;
+  --red-hover: #f04a4f;
+  --gold: #cda86a;
+  --text: #ffffff;
+  --text-muted: #9a9a9a;
+  --text-dim: #6a6a6a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-inter), 'Inter', sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-anton), 'Anton', sans-serif;
+  letter-spacing: 0.3px;
+}
+
+a {
+  color: var(--red);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--red-hover);
+}
+
+input,
+button {
+  font-family: inherit;
+}
+
+input::placeholder {
+  color: var(--text-dim);
+}
+
+button {
+  font-family: inherit;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 24px 100px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.input {
+  background: #1c1c1c;
+  border: 1px solid #333;
+  color: #fff;
+  padding: 11px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+}
+.input:focus {
+  border-color: var(--red);
+}
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-primary {
+  background: var(--red);
+  color: #fff;
+}
+.btn-light {
+  background: #fff;
+  color: #111;
+}
+.btn-gold {
+  background: var(--gold);
+  color: #141414;
+}
+.btn-outline {
+  background: none;
+  border: 1px solid #333;
+  color: var(--text-muted);
+}
+.btn:disabled {
+  background: #1c1c1c;
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th {
+  text-align: left;
+  padding: 12px 16px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  background: var(--surface);
+}
+td {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}

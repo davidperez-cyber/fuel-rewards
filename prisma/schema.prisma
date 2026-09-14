@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CardStage {
+  STAGE_1
+  STAGE_2
+  COMPLETED
+}
+
+enum RewardType {
+  FREE_SHAKE
+  SHAKER
+}
+
+enum StaffRole {
+  STAFF
+  ADMIN
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  email     String?
+  createdAt DateTime @default(now())
+
+  card LoyaltyCard?
+
+  @@index([name])
+}
+
+model LoyaltyCard {
+  id        String    @id @default(cuid())
+  customerId String   @unique
+  customer  Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // Cumulative paid-stamp counter for the *current* cycle: 0-6 in stage 1, 6-14 in stage 2.
+  stamps    Int       @default(0)
+  stage     CardStage @default(STAGE_1)
+
+  reward1ClaimedAt DateTime? // free shake (stage 1 -> 2 transition)
+  reward2ClaimedAt DateTime? // shaker (cycle completion)
+
+  firstStampAt   DateTime? // start of the validity window for the current cycle
+  cycleStartedAt DateTime  @default(now())
+  cycleNumber    Int       @default(1)
+
+  // Wallet integration identifiers
+  serialNumber        String  @unique @default(cuid())
+  authenticationToken String  @unique @default(cuid()) // PassKit Web Service bearer token
+  passUpdatedAt        DateTime @default(now()) // bumped whenever pass content changes, drives APNs push
+  googleObjectId       String? @unique
+
+  stampEvents      StampEvent[]
+  redemptionEvents RedemptionEvent[]
+  resetEvents      CycleResetEvent[]
+  appleDevices     AppleDeviceRegistration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StampEvent {
+  id          String      @id @default(cuid())
+  cardId      String
+  card        LoyaltyCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  staffUserId String?
+  staffUser   StaffUser?  @relation(fields: [staffUserId], references: [id])
+  createdAt   DateTime    @default(now())
+
+  @@index([cardId])
+}
+
+model RedemptionEvent {
+  id          String      @id @default(cuid())
+  cardId      String
+  card        LoyaltyCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  rewardType  RewardType
+  staffUserId String?
+  staffUser   StaffUser?  @relation(fields: [staffUserId], references: [id])
+  createdAt   DateTime    @default(now())
+
+  @@index([cardId])
+}
+
+model CycleResetEvent {
+  id          String      @id @default(cuid())
+  cardId      String
+  card        LoyaltyCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  staffUserId String?
+  staffUser   StaffUser?  @relation(fields: [staffUserId], references: [id])
+  createdAt   DateTime    @default(now())
+
+  @@index([cardId])
+}
+
+// One row per device that registered for push updates on a given card's pass (PassKit Web Service).
+model AppleDeviceRegistration {
+  id                      String      @id @default(cuid())
+  deviceLibraryIdentifier String
+  pushToken               String
+  cardId                  String
+  card                    LoyaltyCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  createdAt               DateTime    @default(now())
+
+  @@unique([deviceLibraryIdentifier, cardId])
+  @@index([cardId])
+}
+
+model StaffUser {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         StaffRole  @default(STAFF)
+  createdAt    DateTime   @default(now())
+
+  stampEvents      StampEvent[]
+  redemptionEvents RedemptionEvent[]
+  resetEvents      CycleResetEvent[]
+}

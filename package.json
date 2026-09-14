@@ -1,0 +1,52 @@
+{
+  "name": "fuel-rewards-platform",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "seed": "tsx prisma/seed.ts",
+    "google:setup-class": "tsx scripts/google-create-class.ts",
+    "verify:pkpass": "tsx scripts/verify-pkpass.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.20.0",
+    "apn": "^2.2.0",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^17.4.2",
+    "googleapis": "^144.0.0",
+    "jose": "^5.9.6",
+    "jszip": "^3.10.1",
+    "next": "^14.2.15",
+    "node-forge": "^1.3.1",
+    "pngjs": "^7.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.16.10",
+    "@types/node-forge": "^1.3.11",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "prisma": "^5.20.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  },
+  "allowScripts": {
+    "@prisma/client@5.22.0": true,
+    "@prisma/engines@5.22.0": true,
+    "esbuild@0.28.2": true,
+    "prisma@5.22.0": true
+  }
+}
