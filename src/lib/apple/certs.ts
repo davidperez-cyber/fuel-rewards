@@ -16,12 +16,26 @@ export interface AppleCerts {
 
 let cached: AppleCerts | null = null;
 
-function readFileFromEnv(envVar: string): string {
-  const p = process.env[envVar];
-  if (!p) throw new Error(`Missing env var ${envVar} for Apple Wallet certificates.`);
+/**
+ * Reads a PEM secret two ways so the same code works in local dev and in a cloud deploy:
+ * - `${name}_B64`: base64-encoded PEM content, set directly as a platform secret/env var
+ *   (Vercel, Firebase Secret Manager, etc. — no filesystem access to a checked-in file needed).
+ * - `${name}_PATH`: path to a local file (what local dev / secrets/apple/ uses).
+ * The base64 form wins when both are present.
+ */
+function readSecret(name: string): string {
+  const b64 = process.env[`${name}_B64`];
+  if (b64) {
+    return Buffer.from(b64, 'base64').toString('utf8');
+  }
+
+  const p = process.env[`${name}_PATH`];
+  if (!p) {
+    throw new Error(`Missing ${name}_B64 or ${name}_PATH env var for Apple Wallet certificates.`);
+  }
   const resolved = path.resolve(process.cwd(), p);
   if (!fs.existsSync(resolved)) {
-    throw new Error(`Apple Wallet file not found for ${envVar}: ${resolved}`);
+    throw new Error(`Apple Wallet file not found for ${name}_PATH: ${resolved}`);
   }
   return fs.readFileSync(resolved, 'utf8');
 }
@@ -29,9 +43,9 @@ function readFileFromEnv(envVar: string): string {
 export function loadAppleCerts(): AppleCerts {
   if (cached) return cached;
 
-  const certPem = readFileFromEnv('APPLE_PASS_CERT_PATH');
-  let keyPem = readFileFromEnv('APPLE_PASS_KEY_PATH');
-  const wwdrPem = readFileFromEnv('APPLE_WWDR_CERT_PATH');
+  const certPem = readSecret('APPLE_PASS_CERT');
+  const keyPem = readSecret('APPLE_PASS_KEY');
+  const wwdrPem = readSecret('APPLE_WWDR_CERT');
   const passphrase = process.env.APPLE_PASS_KEY_PASSPHRASE || undefined;
 
   const certificate = forge.pki.certificateFromPem(certPem);
@@ -52,8 +66,8 @@ export function loadAppleCerts(): AppleCerts {
 
 /** Returns cert/key in PEM form, suitable for TLS-based APNs (node's `tls`/`apn` expect PEM strings/buffers). */
 export function loadAppleTlsCredentials(): { cert: string; key: string; passphrase?: string } {
-  const certPem = readFileFromEnv('APPLE_PASS_CERT_PATH');
-  const keyPem = readFileFromEnv('APPLE_PASS_KEY_PATH');
+  const certPem = readSecret('APPLE_PASS_CERT');
+  const keyPem = readSecret('APPLE_PASS_KEY');
   const passphrase = process.env.APPLE_PASS_KEY_PASSPHRASE || undefined;
   return { cert: certPem, key: keyPem, passphrase };
 }

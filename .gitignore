@@ -7,7 +7,12 @@ dist/
 # secrets — never commit certificates, keys, or service account JSON
 secrets/
 .env
-.env*.local
+.env.*
+!.env.example
+
+# Firebase build/deploy artifacts (contain the built app + copied env files)
+.firebase/
+.runtimeconfig.json
 
 npm-debug.log*
 *.tsbuildinfo
