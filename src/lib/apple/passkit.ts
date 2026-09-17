@@ -69,8 +69,11 @@ export function buildPassJson(card: LoyaltyCard, customer: Customer): Record<str
     ...(webServiceURL ? { webServiceURL, authenticationToken: card.authenticationToken } : {}),
     storeCard: {
       headerFields: [{ key: 'program', label: 'PROGRAMA', value: state.programTitle }],
-      primaryFields: [{ key: 'stamps', label: 'SELLOS', value: state.stampsLabel }],
+      // No primaryFields: Wallet renders storeCard primaryFields as large text *overlaid on
+      // top of* the strip image — which collided with our stamp-circle grid there. The strip
+      // already shows progress visually, so stamps/status/member just need a normal field row.
       secondaryFields: [
+        { key: 'stamps', label: 'SELLOS', value: state.stampsLabel },
         { key: 'status', label: 'ESTADO', value: state.progressText },
       ],
       auxiliaryFields: [{ key: 'member', label: 'CLIENTE', value: customer.name }],
