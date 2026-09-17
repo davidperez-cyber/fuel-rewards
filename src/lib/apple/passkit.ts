@@ -59,7 +59,8 @@ export function buildPassJson(card: LoyaltyCard, customer: Customer): Record<str
     organizationName,
     serialNumber: card.serialNumber,
     description: 'UFC GYM FUEL — Tarjeta de recompensas',
-    logoText: 'FUEL',
+    // No logoText: logo.png already spells out "UFC GYM | FUEL" — Wallet renders logoText
+    // *next to* the logo image, so setting it here just duplicated "FUEL FUEL" on screen.
     backgroundColor: 'rgb(11,11,12)',
     foregroundColor: 'rgb(255,255,255)',
     labelColor: 'rgb(154,154,154)',
