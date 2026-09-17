@@ -3,13 +3,14 @@ import path from 'path';
 import { PNG } from 'pngjs';
 
 /**
- * Required/recommended PNG assets for a storeCard-style .pkpass.
- * If real exported brand assets (from the card design in scraps/pdf-page-*.png) are dropped
- * into ASSETS_DIR with these exact filenames, they are used as-is and never overwritten.
- * Otherwise minimal valid placeholder PNGs are generated once so the pass is installable.
+ * Required/recommended PNG assets for a storeCard-style .pkpass. The real brand assets (see
+ * scripts/generate-brand-assets.ts, derived from scraps/pdf-page-*.png) live in assets/apple-pass/
+ * and are checked into git so every deploy ships them — unlike secrets/, which never leaves this
+ * machine. If a file is somehow missing there, a plain placeholder is generated as a fallback so
+ * the pass still builds instead of throwing.
  */
 
-const ASSETS_DIR = path.resolve(process.cwd(), 'secrets/apple/assets');
+const ASSETS_DIR = path.resolve(process.cwd(), 'assets/apple-pass');
 
 const BLACK: [number, number, number] = [11, 11, 12]; // #0b0b0c
 const RED: [number, number, number] = [226, 28, 36]; // #e21c24
