@@ -5,7 +5,7 @@ const nextConfig = {
   experimental: {
     // Keep these as real node_modules requires (not webpack-bundled) so serverless build
     // tracing picks up their non-JS assets — Prisma's generated query engine binary above all.
-    serverComponentsExternalPackages: ['node-forge', 'apn', 'jszip', 'googleapis', '@prisma/client', 'prisma'],
+    serverComponentsExternalPackages: ['node-forge', 'apn', 'jszip', 'googleapis', '@prisma/client', 'prisma', 'sharp'],
     outputFileTracingIncludes: {
       '/api/**/*': ['./node_modules/.prisma/client/**'],
     },

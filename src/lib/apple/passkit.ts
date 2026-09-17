@@ -5,6 +5,7 @@ import type { Customer, LoyaltyCard } from '@prisma/client';
 import { getCycleState } from '@/lib/loyalty/rules';
 import { loadAppleCerts } from './certs';
 import { loadAppleAssetFiles } from './assets';
+import { generateStripPng } from './stripImage';
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -125,6 +126,16 @@ export async function generatePkpassBuffer(card: LoyaltyCard, customer: Customer
   const passJson = buildPassJson(card, customer);
   const passJsonBuffer = Buffer.from(JSON.stringify(passJson), 'utf8');
   const assets = loadAppleAssetFiles();
+
+  // Replace the static strip with one rendered fresh from the customer's real stamp progress.
+  const [strip1x, strip2x, strip3x] = await Promise.all([
+    generateStripPng(card, 312, 84),
+    generateStripPng(card, 624, 168),
+    generateStripPng(card, 936, 252),
+  ]);
+  assets['strip.png'] = strip1x;
+  assets['strip@2x.png'] = strip2x;
+  assets['strip@3x.png'] = strip3x;
 
   const manifest: Record<string, string> = { 'pass.json': sha1Hex(passJsonBuffer) };
   for (const [filename, buf] of Object.entries(assets)) {
