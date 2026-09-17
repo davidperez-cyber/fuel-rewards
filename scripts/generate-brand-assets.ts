@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
+import { textGroup } from '../src/lib/apple/textPath';
 
 /**
  * Generates the Apple Wallet pass image assets (icon/logo/strip, 1x/2x/3x) from hand-written
@@ -17,8 +18,6 @@ const RED = '#e21c24';
 const GOLD = '#cda86a';
 const WHITE = '#ffffff';
 
-const FONT = "'Arial Black', 'Helvetica Neue', Arial, sans-serif";
-
 function iconSvg(size: number): string {
   const r = size * 0.5;
   const ring = size * 0.36;
@@ -31,13 +30,15 @@ function iconSvg(size: number): string {
 }
 
 function logoSvg(width: number, height: number): string {
-  const fs = height * 0.32;
-  const y = height * 0.63;
-  const dividerX = width * 0.64;
+  const fontSize = height * 0.4;
+  const y = height * 0.68;
+  const ufcGym = textGroup('UFC GYM', fontSize, 0, y, WHITE);
+  const dividerX = ufcGym.width + width * 0.04;
+  const fuel = textGroup('FUEL', fontSize, dividerX + width * 0.05, y, RED);
   return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-    <text x="0" y="${y}" font-family="${FONT}" font-weight="900" font-size="${fs}" fill="${WHITE}">UFC GYM</text>
+    ${ufcGym.svg}
     <line x1="${dividerX}" y1="${height * 0.2}" x2="${dividerX}" y2="${height * 0.8}" stroke="#3a3a3a" stroke-width="${height * 0.025}"/>
-    <text x="${dividerX + width * 0.05}" y="${y}" font-family="${FONT}" font-weight="900" font-size="${fs}" fill="${RED}">FUEL</text>
+    ${fuel.svg}
   </svg>`;
 }
 

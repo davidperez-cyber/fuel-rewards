@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import type { LoyaltyCard } from '@prisma/client';
 import { buildCircles } from '@/lib/loyalty/rules';
+import { centeredTextGroup } from './textPath';
 
 /**
  * Renders the pass's strip image as the actual stamp-progress circles (red = filled, gray
@@ -15,8 +16,6 @@ const RED = '#e21c24';
 const GOLD = '#cda86a';
 const EMPTY_STROKE = '#3a3a3a';
 const EMPTY_TEXT = '#6a6a6a';
-
-const FONT = "'Arial Black', 'Helvetica Neue', Arial, sans-serif";
 
 function circleGridSvg(
   circles: Array<{ key: string; label: string; filled: boolean; kind: 'stamp' | 'reward' }>,
@@ -47,9 +46,10 @@ function circleGridSvg(
       stroke = c.filled ? RED : EMPTY_STROKE;
       textFill = c.filled ? '#ffffff' : EMPTY_TEXT;
     }
-    const fontSize = c.kind === 'reward' ? d * 0.22 : d * 0.42;
+    const fontSize = c.kind === 'reward' ? d * 0.26 : d * 0.46;
+    const labelGroup = centeredTextGroup(c.label, fontSize, cx, cy, textFill);
     return `<circle cx="${cx}" cy="${cy}" r="${d / 2 - 1.5}" fill="${fill}" stroke="${stroke}" stroke-width="${Math.max(1.5, d * 0.06)}"/>
-      <text x="${cx}" y="${cy}" font-family="${FONT}" font-weight="900" font-size="${fontSize}" fill="${textFill}" text-anchor="middle" dominant-baseline="central">${c.label}</text>`;
+      ${labelGroup}`;
   });
 
   return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
@@ -60,9 +60,10 @@ function circleGridSvg(
 
 function completedSvg(width: number, height: number): string {
   const fs = height * 0.24;
+  const labelGroup = centeredTextGroup('CICLO COMPLETADO', fs, width / 2, height / 2, GOLD);
   return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
     <rect width="${width}" height="${height}" fill="${BLACK}"/>
-    <text x="${width / 2}" y="${height / 2}" font-family="${FONT}" font-weight="900" font-size="${fs}" fill="${GOLD}" text-anchor="middle" dominant-baseline="central">¡CICLO COMPLETADO!</text>
+    ${labelGroup}
   </svg>`;
 }
 
