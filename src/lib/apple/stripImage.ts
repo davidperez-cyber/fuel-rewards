@@ -1,20 +1,34 @@
+import fs from 'fs';
+import path from 'path';
 import sharp from 'sharp';
 import type { LoyaltyCard } from '@prisma/client';
 import { buildCircles } from '@/lib/loyalty/rules';
 import { centeredTextGroup } from './textPath';
 
 /**
- * Renders the pass's strip image as the actual stamp progress — a shaker-bottle icon per
- * Protein Shake purchased (filled red once earned, gray outline while pending) plus a gold
- * "GRATIS"/"SHAKER" reward circle — regenerated per download so it always reflects the
- * customer's real progress, since Apple Wallet's pass template has no native way to show a
- * dynamic row of stamps itself.
+ * Renders the pass's strip image as the actual stamp progress: the brand's real shaker artwork
+ * per Protein Shake (bright once earned, dimmed gray while pending) plus a gold "GRATIS"/"SHAKER"
+ * reward circle — regenerated per download so it always reflects the customer's real progress,
+ * since Apple Wallet's pass template has no native way to show a dynamic row of stamps itself.
+ *
+ * The icons are pre-built from assets/apple-pass/source/shaker-reference.png by
+ * scripts/generate-shaker-icons.ts and composited onto the strip here.
  */
 
 const BLACK = '#0b0b0c';
-const RED = '#e21c24';
 const GOLD = '#cda86a';
-const EMPTY_STROKE = '#3a3a3a';
+
+let iconCache: { filled: Buffer; empty: Buffer } | null = null;
+function loadIcons(): { filled: Buffer; empty: Buffer } {
+  if (!iconCache) {
+    const dir = path.resolve(process.cwd(), 'assets/apple-pass');
+    iconCache = {
+      filled: fs.readFileSync(path.join(dir, 'shaker-filled.png')),
+      empty: fs.readFileSync(path.join(dir, 'shaker-empty.png')),
+    };
+  }
+  return iconCache;
+}
 
 /** A subtle diagonal-line texture behind the icons, echoing the brand reference card. */
 function backgroundTexture(width: number, height: number): string {
@@ -26,33 +40,20 @@ function backgroundTexture(width: number, height: number): string {
   return `<rect width="${width}" height="${height}" fill="${BLACK}"/><g>${stripes.join('')}</g>`;
 }
 
-// A protein-shaker silhouette (flip-cap spout + lid + tapered body + liquid line), drawn in a
-// 60x92 local coordinate space, modeled on the classic shaker-bottle icon shape.
-function shakerIconGroup(cx: number, cy: number, size: number, filled: boolean): string {
-  const iconW = 60;
-  const iconH = 92;
-  const scale = size / iconH;
-  const tx = cx - (iconW * scale) / 2;
-  const ty = cy - (iconH * scale) / 2;
-
-  const solid = filled ? RED : 'none';
-  const strokeColor = filled ? RED : EMPTY_STROKE;
-  const strokeWidth = filled ? 0 : 3;
-  const waveColor = filled ? BLACK : 'none';
-
-  return `<g transform="translate(${tx} ${ty}) scale(${scale})">
-    <path d="M38 2 Q50 2 50 10 L44 14 Q40 10 33 11 Z" fill="${solid}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-linejoin="round"/>
-    <rect x="12" y="8" width="30" height="15" rx="6" fill="${solid}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>
-    <rect x="8" y="27" width="44" height="62" rx="9" fill="${solid}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>
-    <path d="M8 58 Q20 51 30 58 T52 58 L52 89 Q52 89 30 89 Q8 89 8 89 Z" fill="${waveColor}"/>
-  </g>`;
+interface Slot {
+  kind: 'stamp' | 'reward';
+  filled: boolean;
+  label: string;
+  cx: number;
+  cy: number;
+  d: number;
 }
 
-function circleGridSvg(
+function layoutSlots(
   circles: Array<{ key: string; label: string; filled: boolean; kind: 'stamp' | 'reward' }>,
   width: number,
   height: number,
-): string {
+): Slot[] {
   const n = circles.length;
   const padX = width * 0.03;
   const padY = height * 0.08;
@@ -62,37 +63,57 @@ function circleGridSvg(
   const totalW = d * n + gap * (n - 1);
   const startX = (width - totalW) / 2;
   const cy = height / 2;
+  return circles.map((c, i) => ({ kind: c.kind, filled: c.filled, label: c.label, cx: startX + d / 2 + i * (d + gap), cy, d }));
+}
 
-  const nodes = circles.map((c, i) => {
-    const cx = startX + d / 2 + i * (d + gap);
-    if (c.kind === 'reward') {
-      const fill = c.filled ? GOLD : 'none';
-      const textFill = c.filled ? BLACK : GOLD;
-      const fontSize = d * 0.26;
-      const labelGroup = centeredTextGroup(c.label, fontSize, cx, cy, textFill);
-      return `<circle cx="${cx}" cy="${cy}" r="${d / 2 - 1.5}" fill="${fill}" stroke="${GOLD}" stroke-width="${Math.max(1.5, d * 0.06)}"/>
-        ${labelGroup}`;
-    }
-    return shakerIconGroup(cx, cy, d * 0.96, c.filled);
-  });
-
+function baseSvg(slots: Slot[], width: number, height: number): string {
+  const rewards = slots
+    .filter((s) => s.kind === 'reward')
+    .map((s) => {
+      const fill = s.filled ? GOLD : 'none';
+      const textFill = s.filled ? BLACK : GOLD;
+      const label = centeredTextGroup(s.label, s.d * 0.26, s.cx, s.cy, textFill);
+      return `<circle cx="${s.cx}" cy="${s.cy}" r="${s.d / 2 - 1.5}" fill="${fill}" stroke="${GOLD}" stroke-width="${Math.max(1.5, s.d * 0.06)}"/>${label}`;
+    });
   return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
     ${backgroundTexture(width, height)}
-    ${nodes.join('\n')}
+    ${rewards.join('\n')}
   </svg>`;
 }
 
 function completedSvg(width: number, height: number): string {
-  const fs = height * 0.24;
-  const labelGroup = centeredTextGroup('CICLO COMPLETADO', fs, width / 2, height / 2, GOLD);
+  const label = centeredTextGroup('CICLO COMPLETADO', height * 0.24, width / 2, height / 2, GOLD);
   return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
     ${backgroundTexture(width, height)}
-    ${labelGroup}
+    ${label}
   </svg>`;
 }
 
 export async function generateStripPng(card: LoyaltyCard, width: number, height: number): Promise<Buffer> {
   const circles = buildCircles(card);
-  const svg = circles.length > 0 ? circleGridSvg(circles, width, height) : completedSvg(width, height);
-  return sharp(Buffer.from(svg)).png().toBuffer();
+  if (circles.length === 0) {
+    return sharp(Buffer.from(completedSvg(width, height))).png().toBuffer();
+  }
+
+  const slots = layoutSlots(circles, width, height);
+  const base = await sharp(Buffer.from(baseSvg(slots, width, height))).png().toBuffer();
+
+  const icons = loadIcons();
+  const stampSlots = slots.filter((s) => s.kind === 'stamp');
+  const iconHeight = Math.round(stampSlots[0].d * 0.96);
+  const [filledIcon, emptyIcon] = await Promise.all([
+    sharp(icons.filled).resize({ height: iconHeight }).png().toBuffer({ resolveWithObject: true }),
+    sharp(icons.empty).resize({ height: iconHeight }).png().toBuffer({ resolveWithObject: true }),
+  ]);
+
+  const composites = stampSlots.map((s) => {
+    const icon = s.filled ? filledIcon : emptyIcon;
+    return {
+      input: icon.data,
+      left: Math.round(s.cx - icon.info.width / 2),
+      top: Math.round(s.cy - icon.info.height / 2),
+    };
+  });
+
+  return sharp(base).composite(composites).png().toBuffer();
 }
