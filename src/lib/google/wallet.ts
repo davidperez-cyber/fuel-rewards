@@ -82,15 +82,18 @@ export async function generateGoogleSaveLink(cardId: string): Promise<string> {
   const objectId = objectIdFor(client, card.serialNumber);
 
   const key = await importPKCS8(client.privateKey, 'RS256');
+  // Claim layout per Google's "Save to Google Wallet" JWT spec: `typ` is a *claim* here (not the
+  // header, not `sub`), alongside aud/iss/iat/origins/payload. Getting this wrong makes
+  // pay.google.com show a generic "error" page.
   const jwt = await new SignJWT({
-    origins: [process.env.APP_BASE_URL || ''],
+    typ: 'savetowallet',
+    origins: [publicBaseUrl()],
     payload: { loyaltyObjects: [{ id: objectId }] },
   })
     .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
     .setIssuedAt()
     .setIssuer(client.serviceAccountEmail)
     .setAudience('google')
-    .setSubject('savetowallet')
     .sign(key);
 
   return `https://pay.google.com/gp/v/save/${jwt}`;
