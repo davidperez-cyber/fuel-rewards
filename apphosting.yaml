@@ -40,3 +40,9 @@ env:
     availability:
       - BUILD
       - RUNTIME
+  - variable: GOOGLE_WALLET_SERVICE_ACCOUNT_B64
+    secret: GOOGLE_WALLET_SERVICE_ACCOUNT_B64
+  - variable: GOOGLE_WALLET_ISSUER_ID
+    value: "3388000000023220965"
+    availability:
+      - RUNTIME

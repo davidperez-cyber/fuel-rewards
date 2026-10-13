@@ -21,22 +21,29 @@ export function getGoogleWalletClient(): GoogleWalletClient | null {
   if (cached !== undefined) return cached;
 
   const issuerId = process.env.GOOGLE_WALLET_ISSUER_ID?.trim();
+  const keyB64 = process.env.GOOGLE_WALLET_SERVICE_ACCOUNT_B64?.trim();
   const keyPath = process.env.GOOGLE_WALLET_SERVICE_ACCOUNT_PATH?.trim();
   const classSuffix = process.env.GOOGLE_WALLET_CLASS_ID?.trim() || 'fuel_rewards_class';
 
-  if (!issuerId || !keyPath) {
+  if (!issuerId || (!keyB64 && !keyPath)) {
     cached = null;
     return null;
   }
 
-  const resolved = path.resolve(process.cwd(), keyPath);
-  if (!fs.existsSync(resolved)) {
-    console.warn(`Google Wallet service account file not found at ${resolved}; Google Wallet integration disabled.`);
-    cached = null;
-    return null;
+  // Cloud deploys provide the key as a base64 secret (no file on disk); local dev uses the file.
+  let keyJson: string;
+  if (keyB64) {
+    keyJson = Buffer.from(keyB64, 'base64').toString('utf8');
+  } else {
+    const resolved = path.resolve(process.cwd(), keyPath!);
+    if (!fs.existsSync(resolved)) {
+      console.warn(`Google Wallet service account file not found at ${resolved}; Google Wallet integration disabled.`);
+      cached = null;
+      return null;
+    }
+    keyJson = fs.readFileSync(resolved, 'utf8');
   }
-
-  const serviceAccount = JSON.parse(fs.readFileSync(resolved, 'utf8'));
+  const serviceAccount = JSON.parse(keyJson);
   const auth = new google.auth.GoogleAuth({
     credentials: serviceAccount,
     scopes: ['https://www.googleapis.com/auth/wallet_object.issuer'],

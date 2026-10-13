@@ -9,8 +9,15 @@ function objectIdFor(client: NonNullable<ReturnType<typeof getGoogleWalletClient
   return `${client.issuerId}.${serialNumber}`;
 }
 
-function buildObjectResource(client: NonNullable<ReturnType<typeof getGoogleWalletClient>>, card: { serialNumber: string; stamps: number; stage: string; firstStampAt: Date | null; reward1ClaimedAt: Date | null; reward2ClaimedAt: Date | null }, customer: { id: string; name: string }) {
+function publicBaseUrl(): string {
+  return (process.env.APP_BASE_URL || '').replace(/\/$/, '');
+}
+
+function buildObjectResource(client: NonNullable<ReturnType<typeof getGoogleWalletClient>>, card: { serialNumber: string; authenticationToken: string; stamps: number; stage: string; cycleNumber: number; firstStampAt: Date | null; reward1ClaimedAt: Date | null; reward2ClaimedAt: Date | null }, customer: { id: string; name: string }) {
   const state = getCycleState(card as Parameters<typeof getCycleState>[0]);
+  // `v` changes whenever progress changes, so Google refetches the strip image instead of serving its cached copy.
+  const version = `${card.cycleNumber}-${card.stage}-${card.stamps}-${card.reward1ClaimedAt ? 1 : 0}${card.reward2ClaimedAt ? 1 : 0}`;
+  const heroUrl = `${publicBaseUrl()}/api/wallet/strip/${card.serialNumber}?t=${card.authenticationToken}&v=${version}`;
   return {
     id: objectIdFor(client, card.serialNumber),
     classId: client.classId,
@@ -27,6 +34,10 @@ function buildObjectResource(client: NonNullable<ReturnType<typeof getGoogleWall
       alternateText: card.serialNumber,
     },
     textModulesData: [{ header: state.programTitle, body: state.progressText, id: 'status' }],
+    // Only attach the hero image when the app is reachable over public HTTPS (Google must fetch it).
+    ...(heroUrl.startsWith('https://')
+      ? { heroImage: { sourceUri: { uri: heroUrl }, contentDescription: { defaultValue: { language: 'es-MX', value: 'Progreso de sellos' } } } }
+      : {}),
   };
 }
 

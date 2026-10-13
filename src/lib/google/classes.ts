@@ -15,7 +15,7 @@ export async function ensureLoyaltyClass(): Promise<void> {
     programName: 'FUEL Rewards',
     programLogo: {
       sourceUri: {
-        uri: 'https://raw.githubusercontent.com/', // placeholder — replace with a hosted UFC GYM FUEL logo URL before launch
+        uri: process.env.GOOGLE_WALLET_LOGO_URL || `${(process.env.APP_BASE_URL || '').replace(/\/$/, '')}/wallet-logo.png`,
       },
       contentDescription: { defaultValue: { language: 'es-MX', value: 'UFC GYM FUEL' } },
     },
