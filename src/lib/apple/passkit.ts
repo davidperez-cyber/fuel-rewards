@@ -132,9 +132,9 @@ export async function generatePkpassBuffer(card: LoyaltyCard, customer: Customer
 
   // Replace the static strip with one rendered fresh from the customer's real stamp progress.
   const [strip1x, strip2x, strip3x] = await Promise.all([
-    generateStripPng(card, 312, 84),
-    generateStripPng(card, 624, 168),
-    generateStripPng(card, 936, 252),
+    generateStripPng(card, 312, 125),
+    generateStripPng(card, 624, 250),
+    generateStripPng(card, 936, 375),
   ]);
   assets['strip.png'] = strip1x;
   assets['strip@2x.png'] = strip2x;

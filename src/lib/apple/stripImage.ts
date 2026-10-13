@@ -1,119 +1,112 @@
 import fs from 'fs';
 import path from 'path';
-import sharp from 'sharp';
+import sharp, { type OverlayOptions } from 'sharp';
 import type { LoyaltyCard } from '@prisma/client';
 import { buildCircles } from '@/lib/loyalty/rules';
 import { centeredTextGroup } from './textPath';
 
 /**
- * Renders the pass's strip image as the actual stamp progress: the brand's real shaker artwork
- * per Protein Shake (bright once earned, dimmed gray while pending) plus a gold "GRATIS"/"SHAKER"
- * reward circle — regenerated per download so it always reflects the customer's real progress,
- * since Apple Wallet's pass template has no native way to show a dynamic row of stamps itself.
+ * Renders the pass's strip image: the brand's real shaker artwork per Protein Shake in a 2-row
+ * grid (bright once earned, dimmed while pending) with one big gold shaker on the right as the
+ * reward ("GRATIS" / "SHAKER"), on the same solid black as the pass — mirroring the layout of the
+ * original card design. Regenerated per download so it always reflects the customer's progress,
+ * since Apple Wallet has no native way to show a dynamic row of stamps.
  *
- * The icons are pre-built from assets/apple-pass/source/shaker-reference.png by
- * scripts/generate-shaker-icons.ts and composited onto the strip here.
+ * Wallet displays the strip in a roughly 2.5:1 box and crops (aspect-fill) anything outside it, so
+ * the image is built at that ratio (see STRIP_SIZES in passkit.ts) with side margins to spare.
+ *
+ * Icons are pre-built from assets/apple-pass/source/shaker-reference.png by
+ * scripts/generate-shaker-icons.ts.
  */
 
 const BLACK = '#0b0b0c';
 const GOLD = '#cda86a';
+const GOLD_DIM = '#b39560';
 
-let iconCache: { filled: Buffer; empty: Buffer } | null = null;
-function loadIcons(): { filled: Buffer; empty: Buffer } {
+type IconName = 'filled' | 'empty' | 'gold' | 'goldDim';
+const ICON_FILES: Record<IconName, string> = {
+  filled: 'shaker-filled.png',
+  empty: 'shaker-empty.png',
+  gold: 'shaker-gold.png',
+  goldDim: 'shaker-gold-dim.png',
+};
+
+let iconCache: Record<IconName, Buffer> | null = null;
+function loadIcons(): Record<IconName, Buffer> {
   if (!iconCache) {
     const dir = path.resolve(process.cwd(), 'assets/apple-pass');
-    iconCache = {
-      filled: fs.readFileSync(path.join(dir, 'shaker-filled.png')),
-      empty: fs.readFileSync(path.join(dir, 'shaker-empty.png')),
-    };
+    iconCache = Object.fromEntries(
+      (Object.keys(ICON_FILES) as IconName[]).map((k) => [k, fs.readFileSync(path.join(dir, ICON_FILES[k]))]),
+    ) as Record<IconName, Buffer>;
   }
   return iconCache;
 }
 
-/** A subtle diagonal-line texture behind the icons, echoing the brand reference card. */
-function backgroundTexture(width: number, height: number): string {
-  const stripes: string[] = [];
-  const gap = height * 0.5;
-  for (let x = -height; x < width + height; x += gap) {
-    stripes.push(`<line x1="${x}" y1="${height}" x2="${x + height}" y2="0" stroke="#161617" stroke-width="${height * 0.04}"/>`);
-  }
-  return `<rect width="${width}" height="${height}" fill="${BLACK}"/><g>${stripes.join('')}</g>`;
+async function resizedIcon(name: IconName, height: number) {
+  return sharp(loadIcons()[name]).resize({ height: Math.max(1, Math.round(height)) }).png().toBuffer({ resolveWithObject: true });
 }
 
-interface Slot {
-  kind: 'stamp' | 'reward';
-  filled: boolean;
-  label: string;
-  cx: number;
-  cy: number;
-  d: number;
-}
-
-function layoutSlots(
-  circles: Array<{ key: string; label: string; filled: boolean; kind: 'stamp' | 'reward' }>,
-  width: number,
-  height: number,
-): Slot[] {
-  const n = circles.length;
-  const padX = width * 0.03;
-  const padY = height * 0.08;
-  const gap = width * 0.02;
-  const usableW = width - padX * 2 - gap * (n - 1);
-  const d = Math.min(usableW / n, height - padY * 2);
-  const totalW = d * n + gap * (n - 1);
-  const startX = (width - totalW) / 2;
-  const cy = height / 2;
-  return circles.map((c, i) => ({ kind: c.kind, filled: c.filled, label: c.label, cx: startX + d / 2 + i * (d + gap), cy, d }));
-}
-
-function baseSvg(slots: Slot[], width: number, height: number): string {
-  const rewards = slots
-    .filter((s) => s.kind === 'reward')
-    .map((s) => {
-      const fill = s.filled ? GOLD : 'none';
-      const textFill = s.filled ? BLACK : GOLD;
-      const label = centeredTextGroup(s.label, s.d * 0.26, s.cx, s.cy, textFill);
-      return `<circle cx="${s.cx}" cy="${s.cy}" r="${s.d / 2 - 1.5}" fill="${fill}" stroke="${GOLD}" stroke-width="${Math.max(1.5, s.d * 0.06)}"/>${label}`;
-    });
-  return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-    ${backgroundTexture(width, height)}
-    ${rewards.join('\n')}
-  </svg>`;
-}
-
-function completedSvg(width: number, height: number): string {
-  const label = centeredTextGroup('CICLO COMPLETADO', height * 0.24, width / 2, height / 2, GOLD);
-  return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-    ${backgroundTexture(width, height)}
-    ${label}
-  </svg>`;
+function solidSvg(width: number, height: number, inner = ''): string {
+  return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="${BLACK}"/>${inner}</svg>`;
 }
 
 export async function generateStripPng(card: LoyaltyCard, width: number, height: number): Promise<Buffer> {
   const circles = buildCircles(card);
+
   if (circles.length === 0) {
-    return sharp(Buffer.from(completedSvg(width, height))).png().toBuffer();
+    const label = centeredTextGroup('CICLO COMPLETADO', height * 0.16, width / 2, height / 2, GOLD);
+    return sharp(Buffer.from(solidSvg(width, height, label))).png().toBuffer();
   }
 
-  const slots = layoutSlots(circles, width, height);
-  const base = await sharp(Buffer.from(baseSvg(slots, width, height))).png().toBuffer();
+  const stamps = circles.filter((c) => c.kind === 'stamp');
+  const reward = circles.find((c) => c.kind === 'reward');
 
-  const icons = loadIcons();
-  const stampSlots = slots.filter((s) => s.kind === 'stamp');
-  const iconHeight = Math.round(stampSlots[0].d * 0.96);
-  const [filledIcon, emptyIcon] = await Promise.all([
-    sharp(icons.filled).resize({ height: iconHeight }).png().toBuffer({ resolveWithObject: true }),
-    sharp(icons.empty).resize({ height: iconHeight }).png().toBuffer({ resolveWithObject: true }),
+  const aspect = await sharp(loadIcons().filled).metadata().then((m) => (m.width ?? 1) / (m.height ?? 1));
+
+  const padX = width * 0.07;
+  const padY = height * 0.07;
+
+  // Reward column (big gold shaker + label) on the right.
+  const rewardIconH = height * 0.68;
+  const rewardIconW = rewardIconH * aspect;
+  const rewardColW = rewardIconW + width * 0.05;
+  const rewardCx = width - padX - rewardIconW / 2;
+  const rewardTop = padY;
+  const labelCy = rewardTop + rewardIconH + (height - padY - (rewardTop + rewardIconH)) / 2;
+
+  // Stamp grid: 2 rows, filled left-to-right then top-to-bottom, left of the reward column.
+  const rows = 2;
+  const cols = Math.ceil(stamps.length / rows);
+  const gridW = width - padX * 2 - rewardColW;
+  const cellW = gridW / cols;
+  const cellH = (height - padY * 2) / rows;
+  const stampIconH = Math.min(cellH * 0.92, (cellW * 0.9) / aspect);
+
+  const labelSvg = reward
+    ? centeredTextGroup(reward.label, height * 0.1, rewardCx, labelCy, reward.filled ? GOLD : GOLD_DIM)
+    : '';
+  const base = await sharp(Buffer.from(solidSvg(width, height, labelSvg))).png().toBuffer();
+
+  const [filledIcon, emptyIcon, goldIcon, goldDimIcon] = await Promise.all([
+    resizedIcon('filled', stampIconH),
+    resizedIcon('empty', stampIconH),
+    resizedIcon('gold', rewardIconH),
+    resizedIcon('goldDim', rewardIconH),
   ]);
 
-  const composites = stampSlots.map((s) => {
+  const composites: OverlayOptions[] = stamps.map((s, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
     const icon = s.filled ? filledIcon : emptyIcon;
-    return {
-      input: icon.data,
-      left: Math.round(s.cx - icon.info.width / 2),
-      top: Math.round(s.cy - icon.info.height / 2),
-    };
+    const cx = padX + cellW * (col + 0.5);
+    const cy = padY + cellH * (row + 0.5);
+    return { input: icon.data, left: Math.round(cx - icon.info.width / 2), top: Math.round(cy - icon.info.height / 2) };
   });
+
+  if (reward) {
+    const icon = reward.filled ? goldIcon : goldDimIcon;
+    composites.push({ input: icon.data, left: Math.round(rewardCx - icon.info.width / 2), top: Math.round(rewardTop) });
+  }
 
   return sharp(base).composite(composites).png().toBuffer();
 }

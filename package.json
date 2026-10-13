@@ -12,7 +12,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
     "google:setup-class": "tsx scripts/google-create-class.ts",
-    "verify:pkpass": "tsx scripts/verify-pkpass.ts"
+    "verify:pkpass": "tsx scripts/verify-pkpass.ts",
+    "customers:wipe": "tsx scripts/wipe-customers.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
