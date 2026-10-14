@@ -82,7 +82,7 @@ export default function SignupPage() {
             <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>Tu tarjeta está lista con 0 sellos.</div>
           </div>
           <div style={{ width: '100%' }}>
-            <CardPreview data={result.card} showBarcode={false} />
+            <CardPreview data={result.card} customerName={result.name} />
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
             <a className="btn btn-light" href={result.card.appleWalletUrl}>+ Apple Wallet</a>

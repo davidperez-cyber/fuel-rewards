@@ -142,7 +142,7 @@ export default function StaffPage() {
               </div>
 
               <div style={{ maxWidth: 420 }}>
-                <CardPreview data={selected.card} showBarcode={false} />
+                <CardPreview data={selected.card} customerName={selected.name} />
               </div>
 
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

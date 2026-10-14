@@ -128,3 +128,198 @@ td {
   padding: 12px 16px;
   border-top: 1px solid var(--border);
 }
+
+/* ---------- Reward card (CardPreview) ---------- */
+.rc {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 22px 20px 24px;
+  color: #fff;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.022) 0 2px, transparent 2px 16px),
+    #0b0b0c;
+  border: 1px solid var(--red);
+  border-radius: 22px;
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow: 0 18px 40px -22px rgba(226, 28, 36, 0.5);
+}
+/* UFC-style slanted slashes in two opposite corners */
+.rc::before,
+.rc::after {
+  content: '';
+  position: absolute;
+  width: 76px;
+  height: 16px;
+  background: var(--red);
+  z-index: -1;
+}
+.rc::before {
+  top: 8px;
+  left: -26px;
+  transform: rotate(-38deg);
+}
+.rc::after {
+  bottom: 8px;
+  right: -26px;
+  transform: rotate(-38deg);
+}
+
+.rc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+  border-bottom: 2px solid;
+  border-image: linear-gradient(90deg, var(--red) 0%, var(--red) 55%, transparent 100%) 1;
+}
+.rc-logo {
+  height: 38px;
+  width: auto;
+  max-width: 58%;
+  object-fit: contain;
+}
+.rc-program {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  min-width: 0;
+}
+.rc-program-label {
+  font-size: 10px;
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.28em;
+  color: var(--text-muted);
+}
+.rc-program-name {
+  font-size: 13px;
+  font-weight: 600;
+  font-style: italic;
+  line-height: 1.25;
+}
+
+.rc-progress {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 0 14px;
+}
+.rc-stamps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  gap: 12px 4px;
+  justify-items: center;
+}
+.rc-stamps li {
+  display: flex;
+}
+.rc-cup {
+  display: block;
+  height: var(--cup-h, 76px);
+  width: auto;
+}
+.rc-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.rc-cup-reward {
+  height: calc(var(--cup-h, 76px) * 1.9);
+}
+.rc-reward-label {
+  font-family: var(--font-anton), 'Anton', sans-serif;
+  font-size: 20px;
+  letter-spacing: 0.02em;
+  color: var(--gold);
+}
+.rc-complete {
+  font-family: var(--font-anton), 'Anton', sans-serif;
+  font-size: 26px;
+  text-align: center;
+  color: var(--gold);
+  padding: 34px 0;
+}
+
+.rc-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.5fr) minmax(0, 1.2fr);
+  margin: 4px 0 20px;
+  padding: 0;
+}
+.rc-summary > div {
+  min-width: 0;
+  padding: 2px 14px;
+}
+.rc-summary > div:first-child {
+  padding-left: 2px;
+}
+.rc-summary > div + div {
+  border-left: 2px solid var(--red);
+}
+.rc-summary dt {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.rc-summary dd {
+  margin: 4px 0 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.rc-summary .rc-stamps-value {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.rc-qr {
+  display: flex;
+  justify-content: center;
+}
+.rc-qr-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 14px 10px;
+  background: #fff; /* clean quiet zone so the QR always scans */
+  border-radius: 12px;
+}
+.rc-qr-box img {
+  display: block;
+  width: min(176px, 52vw);
+  height: auto;
+}
+.rc-qr-box span {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111;
+}
+
+@media (max-width: 400px) {
+  .rc {
+    padding: 18px 14px 20px;
+  }
+  .rc-summary {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 14px;
+  }
+  .rc-summary .rc-client {
+    grid-column: 1 / -1;
+    border-left: 0;
+    padding-left: 2px;
+  }
+}

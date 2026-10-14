@@ -32,11 +32,16 @@ function iconSvg(size: number): string {
 function logoSvg(width: number, height: number): string {
   const fontSize = height * 0.4;
   const y = height * 0.68;
-  const ufcGym = textGroup('UFC GYM', fontSize, 0, y, WHITE);
-  const dividerX = ufcGym.width + width * 0.04;
-  const fuel = textGroup('FUEL', fontSize, dividerX + width * 0.05, y, RED);
+  // "UFC" red, "GYM" white with a red underline, divider, "FUEL" red — as in the brand reference.
+  const ufc = textGroup('UFC', fontSize, 0, y, RED);
+  const gymX = ufc.width + fontSize * 0.22;
+  const gym = textGroup('GYM', fontSize, gymX, y, WHITE);
+  const dividerX = gymX + gym.width + width * 0.035;
+  const fuel = textGroup('FUEL', fontSize, dividerX + width * 0.045, y, RED);
   return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-    ${ufcGym.svg}
+    ${ufc.svg}
+    ${gym.svg}
+    <rect x="${gymX}" y="${y + height * 0.07}" width="${gym.width}" height="${Math.max(1, height * 0.03)}" fill="${RED}"/>
     <line x1="${dividerX}" y1="${height * 0.2}" x2="${dividerX}" y2="${height * 0.8}" stroke="#3a3a3a" stroke-width="${height * 0.025}"/>
     ${fuel.svg}
   </svg>`;
@@ -86,6 +91,10 @@ async function main() {
     fs.writeFileSync(path.join(OUT_DIR, spec.filename), buf);
     console.log('wrote', spec.filename, buf.length, 'bytes');
   }
+  // The web card shows the same logo file the Wallet pass uses.
+  const webDir = path.resolve(__dirname, '../public/card');
+  fs.mkdirSync(webDir, { recursive: true });
+  fs.copyFileSync(path.join(OUT_DIR, 'logo@3x.png'), path.join(webDir, 'logo.png'));
 }
 
 main().catch((err) => {

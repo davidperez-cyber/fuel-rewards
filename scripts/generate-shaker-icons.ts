@@ -71,6 +71,12 @@ async function main() {
   await sharp(empty, raw).png().toFile(path.join(OUT, 'shaker-empty.png'));
   await sharp(gold, raw).png().toFile(path.join(OUT, 'shaker-gold.png'));
   await sharp(goldDim, raw).png().toFile(path.join(OUT, 'shaker-gold-dim.png'));
+  // The web card (CardPreview) serves the very same files from /card/, so web and Wallet always match.
+  const webDir = path.resolve(__dirname, '../public/card');
+  fs.mkdirSync(webDir, { recursive: true });
+  for (const f of ['shaker-filled.png', 'shaker-empty.png', 'shaker-gold.png', 'shaker-gold-dim.png']) {
+    fs.copyFileSync(path.join(OUT, f), path.join(webDir, f));
+  }
   console.log('wrote shaker-filled / empty / gold / gold-dim', info.width, 'x', info.height);
 }
 

@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 export interface CardPreviewData {
   programTitle: string;
   programSub: string;
@@ -7,69 +9,88 @@ export interface CardPreviewData {
   circles: Array<{ key: string; label: string; filled: boolean; kind: 'stamp' | 'reward' }>;
 }
 
-function circleStyle(c: CardPreviewData['circles'][number]): React.CSSProperties {
-  if (c.kind === 'reward') {
-    return c.filled
-      ? { background: 'var(--gold)', borderColor: 'var(--gold)', color: '#141414' }
-      : { background: 'transparent', borderColor: 'var(--gold)', color: 'var(--gold)' };
-  }
-  return c.filled
-    ? { background: 'var(--red)', borderColor: 'var(--red)', color: '#fff' }
-    : { background: 'transparent', borderColor: '#3a3a3a', color: '#6a6a6a' };
+interface Props {
+  data: CardPreviewData;
+  customerName?: string;
+  /** URL of the card's QR image (/api/wallet/qr/...). When omitted the QR block is not rendered. */
+  qrSrc?: string;
 }
 
-export default function CardPreview({ data, showBarcode = true }: { data: CardPreviewData; showBarcode?: boolean }) {
+/**
+ * The UFC GYM FUEL reward card as a real web component (styles: .rc-* in globals.css). It uses the
+ * exact shaker artwork the Wallet passes use (public/card/*.png, copied from assets/apple-pass by
+ * scripts/generate-shaker-icons.ts) — earned stamps bright, pending ones dimmed, reward in gold.
+ */
+export default function CardPreview({ data, customerName, qrSrc }: Props) {
+  const stamps = data.circles.filter((c) => c.kind === 'stamp');
+  const reward = data.circles.find((c) => c.kind === 'reward');
+  const completed = data.stage === 'COMPLETED';
+  const cols = Math.max(1, Math.ceil(stamps.length / 2));
+  const style = { '--cols': cols, '--cup-h': stamps.length > 6 ? '54px' : '76px' } as CSSProperties;
+
   return (
-    <div style={{ background: '#000', border: '1px solid #262626', borderRadius: 20, padding: '22px 18px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span className="font-display" style={{ fontSize: 20 }}>UFC GYM</span>
-        <span style={{ width: 1, height: 15, background: '#3a3a3a' }} />
-        <span className="font-display" style={{ fontSize: 20, color: 'var(--red)' }}>FUEL</span>
-      </div>
-      <div>
-        <div className="font-display" style={{ fontSize: 16 }}>{data.programTitle}</div>
-        <div style={{ color: 'var(--red)', fontSize: 12, fontWeight: 700, marginTop: 4 }}>{data.programSub}</div>
-      </div>
-      {data.circles.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
-          {data.circles.map((c) => (
-            <div
-              key={c.key}
-              style={{
-                aspectRatio: '1',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: c.kind === 'reward' ? 11 : 16,
-                border: '2px solid',
-                textAlign: 'center',
-                lineHeight: 1,
-                ...circleStyle(c),
-              }}
-            >
-              {c.label}
+    <section className="rc" aria-label="Tarjeta de recompensas UFC GYM FUEL" style={style}>
+      <header className="rc-header">
+        <img className="rc-logo" src="/card/logo.png" alt="UFC GYM FUEL" />
+        <div className="rc-program">
+          <span className="rc-program-label">PROGRAMA</span>
+          <span className="rc-program-name">{data.programTitle}</span>
+        </div>
+      </header>
+
+      {completed ? (
+        <div className="rc-complete">¡CICLO COMPLETADO!</div>
+      ) : (
+        <div className="rc-progress">
+          <ul className="rc-stamps" aria-label={`Sellos: ${data.stampsLabel}`}>
+            {stamps.map((s, i) => (
+              <li key={s.key}>
+                <img
+                  className="rc-cup"
+                  src={s.filled ? '/card/shaker-filled.png' : '/card/shaker-empty.png'}
+                  alt={`Sello ${i + 1}: ${s.filled ? 'obtenido' : 'pendiente'}`}
+                />
+              </li>
+            ))}
+          </ul>
+          {reward && (
+            <div className="rc-reward">
+              <img
+                className="rc-cup rc-cup-reward"
+                src={reward.filled ? '/card/shaker-gold.png' : '/card/shaker-gold-dim.png'}
+                alt={`Premio ${reward.label}: ${reward.filled ? 'disponible' : 'aún no disponible'}`}
+              />
+              <span className="rc-reward-label">{reward.label}</span>
             </div>
-          ))}
+          )}
         </div>
       )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: '1px solid #262626', paddingTop: 14 }}>
+
+      <dl className="rc-summary">
         <div>
-          <div style={{ fontSize: 9, letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 700 }}>SELLOS</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{data.stampsLabel}</div>
+          <dt>SELLOS</dt>
+          <dd className="rc-stamps-value">{data.stampsLabel}</dd>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 9, letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 700 }}>ESTADO</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: data.stage === 'COMPLETED' ? 'var(--text-dim)' : '#fff' }}>{data.progressText}</div>
+        <div>
+          <dt>ESTADO</dt>
+          <dd>{data.progressText}</dd>
         </div>
-      </div>
-      {showBarcode && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, paddingTop: 6 }}>
-          <div style={{ width: 110, height: 110, background: 'repeating-linear-gradient(45deg,#fff 0 4px,#000 4px 8px)', borderRadius: 8 }} />
-          <div style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'monospace', letterSpacing: '0.05em' }}>ESCANEAR EN CAJA</div>
+        {customerName && (
+          <div className="rc-client">
+            <dt>CLIENTE</dt>
+            <dd>{customerName}</dd>
+          </div>
+        )}
+      </dl>
+
+      {qrSrc && (
+        <div className="rc-qr">
+          <div className="rc-qr-box">
+            <img src={qrSrc} alt="Código QR de tu tarjeta" width={176} height={176} />
+            <span>Escanear en caja</span>
+          </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

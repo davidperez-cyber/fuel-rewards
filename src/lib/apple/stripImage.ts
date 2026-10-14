@@ -46,8 +46,25 @@ async function resizedIcon(name: IconName, height: number) {
   return sharp(loadIcons()[name]).resize({ height: Math.max(1, Math.round(height)) }).png().toBuffer({ resolveWithObject: true });
 }
 
+/**
+ * UFC-style red accents: hairlines along the top/bottom edges (they read as the separators of the
+ * card) and a slanted slash in the top-left and bottom-right corners. Kept inside the margins so
+ * they never touch the stamp icons or the reward label.
+ */
+function redAccents(width: number, height: number): string {
+  const RED = '#e21c24';
+  const t = Math.max(1.5, height * 0.009);
+  const k = 2.2; // slash steepness (dy per dx)
+  const x1 = width * 0.025;
+  const x2 = width * 0.06;
+  const slashTL = `${x1},0 ${x2},0 0,${k * x2} 0,${k * x1}`;
+  const slashBR = `${width - x1},${height} ${width - x2},${height} ${width},${height - k * x2} ${width},${height - k * x1}`;
+  return `<rect width="${width}" height="${t}" fill="${RED}"/><rect y="${height - t}" width="${width}" height="${t}" fill="${RED}"/>
+    <polygon points="${slashTL}" fill="${RED}"/><polygon points="${slashBR}" fill="${RED}"/>`;
+}
+
 function solidSvg(width: number, height: number, inner = ''): string {
-  return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="${BLACK}"/>${inner}</svg>`;
+  return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="${BLACK}"/>${redAccents(width, height)}${inner}</svg>`;
 }
 
 export async function generateStripPng(card: LoyaltyCard, width: number, height: number): Promise<Buffer> {
