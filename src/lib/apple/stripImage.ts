@@ -55,12 +55,17 @@ function redAccents(width: number, height: number): string {
   const RED = '#e21c24';
   const t = Math.max(1.5, height * 0.009);
   const k = 2.2; // slash steepness (dy per dx)
-  const x1 = width * 0.025;
-  const x2 = width * 0.06;
-  const slashTL = `${x1},0 ${x2},0 0,${k * x2} 0,${k * x1}`;
-  const slashBR = `${width - x1},${height} ${width - x2},${height} ${width},${height - k * x2} ${width},${height - k * x1}`;
+  const a = width * 0.054; // gray plane, along the corner
+  const r = width * 0.031; // thick red streak, right next to it
+  const g = width * 0.018; // second gray plane beyond the streak
+  // Top-left corner: gray plane, red streak, gray plane. Bottom-right is the same, rotated 180°.
+  const corner = [
+    `<polygon points="0,0 ${a},0 0,${k * a}" fill="#2a2a2c"/>`,
+    `<polygon points="${a + r + width * 0.004},0 ${a + r + width * 0.004 + g},0 0,${k * (a + r + width * 0.004 + g)} 0,${k * (a + r + width * 0.004)}" fill="#19191a"/>`,
+    `<polygon points="${a},0 ${a + r},0 0,${k * (a + r)} 0,${k * a}" fill="${RED}"/>`,
+  ].join('');
   return `<rect width="${width}" height="${t}" fill="${RED}"/><rect y="${height - t}" width="${width}" height="${t}" fill="${RED}"/>
-    <polygon points="${slashTL}" fill="${RED}"/><polygon points="${slashBR}" fill="${RED}"/>`;
+    <g>${corner}</g><g transform="rotate(180 ${width / 2} ${height / 2})">${corner}</g>`;
 }
 
 function solidSvg(width: number, height: number, inner = ''): string {

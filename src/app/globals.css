@@ -130,41 +130,60 @@ td {
 }
 
 /* ---------- Reward card (CardPreview) ---------- */
+/* .rc = dark "stage" with the corner art; .rc-frame = the red-bordered card itself. */
 .rc {
   position: relative;
   width: 100%;
   max-width: 440px;
   margin: 0 auto;
-  padding: 22px 20px 24px;
+  padding: 11.5% 3.9%;
   color: #fff;
   background:
-    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.022) 0 2px, transparent 2px 16px),
-    #0b0b0c;
-  border: 1px solid var(--red);
-  border-radius: 22px;
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.018) 0 2px, transparent 2px 14px),
+    #0a0a0b;
+  border: 1px solid #1c1c1e;
+  border-radius: 20px;
   overflow: hidden;
   isolation: isolate;
-  box-shadow: 0 18px 40px -22px rgba(226, 28, 36, 0.5);
+  box-shadow: 0 22px 46px -26px rgba(226, 28, 36, 0.55);
 }
-/* UFC-style slanted slashes in two opposite corners */
-.rc::before,
-.rc::after {
-  content: '';
+.rc-deco {
   position: absolute;
-  width: 76px;
-  height: 16px;
-  background: var(--red);
-  z-index: -1;
+  display: block;
+  height: auto;
+  pointer-events: none;
 }
-.rc::before {
-  top: 8px;
-  left: -26px;
-  transform: rotate(-38deg);
+.rc-deco-tl {
+  top: 0;
+  left: 0;
+  width: 29.3%;
+  z-index: 0;
 }
-.rc::after {
-  bottom: 8px;
-  right: -26px;
-  transform: rotate(-38deg);
+.rc-deco-br {
+  right: 0;
+  bottom: 0;
+  width: 33.2%;
+  z-index: 0;
+}
+.rc-frame {
+  position: relative; /* no z-index: the content (z-index 1) must paint above .rc-deco-br */
+  overflow: hidden;
+  padding: 24px 20px 26px;
+  background: #0a0a0b;
+  border: 1.5px solid var(--red);
+  border-radius: 24px;
+}
+.rc-cage {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 29.6%;
+  height: auto;
+  pointer-events: none;
+}
+.rc-frame > :not(.rc-cage) {
+  position: relative;
+  z-index: 1;
 }
 
 .rc-header {
@@ -172,16 +191,13 @@ td {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-bottom: 12px;
-  margin-bottom: 18px;
-  border-bottom: 2px solid;
-  border-image: linear-gradient(90deg, var(--red) 0%, var(--red) 55%, transparent 100%) 1;
+  margin-bottom: 24px;
 }
 .rc-logo {
-  height: 38px;
-  width: auto;
-  max-width: 58%;
-  object-fit: contain;
+  display: block;
+  width: 56%;
+  max-width: 260px;
+  height: auto;
 }
 .rc-program {
   display: flex;
@@ -189,17 +205,25 @@ td {
   align-items: flex-end;
   text-align: right;
   min-width: 0;
+  flex: 1;
+}
+.rc-program::after {
+  content: '';
+  align-self: stretch;
+  height: 2px;
+  margin-top: 8px;
+  background: linear-gradient(90deg, var(--red), transparent);
 }
 .rc-program-label {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 800;
   font-style: italic;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.3em;
   color: var(--text-muted);
 }
 .rc-program-name {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   font-style: italic;
   line-height: 1.25;
 }
@@ -209,7 +233,7 @@ td {
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 14px;
-  padding: 6px 0 14px;
+  padding: 0 0 18px;
 }
 .rc-stamps {
   list-style: none;
@@ -254,7 +278,7 @@ td {
 .rc-summary {
   display: grid;
   grid-template-columns: auto minmax(0, 1.5fr) minmax(0, 1.2fr);
-  margin: 4px 0 20px;
+  margin: 4px 0 24px;
   padding: 0;
 }
 .rc-summary > div {
@@ -294,32 +318,40 @@ td {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 14px 14px 10px;
+  width: 42%;
+  min-width: 150px;
+  max-width: 200px;
+  padding: 12px 12px 9px;
   background: #fff; /* clean quiet zone so the QR always scans */
   border-radius: 12px;
 }
 .rc-qr-box img {
   display: block;
-  width: min(176px, 52vw);
+  width: 100%;
   height: auto;
 }
 .rc-qr-box span {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: #111;
+  white-space: nowrap;
 }
 
 @media (max-width: 400px) {
-  .rc {
-    padding: 18px 14px 20px;
+  .rc-frame {
+    padding: 20px 14px 22px;
   }
-  .rc-summary {
-    grid-template-columns: auto minmax(0, 1fr);
-    row-gap: 14px;
+  .rc-summary > div {
+    padding: 2px 8px;
   }
-  .rc-summary .rc-client {
-    grid-column: 1 / -1;
-    border-left: 0;
-    padding-left: 2px;
+  .rc-summary dt {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+  .rc-summary dd {
+    font-size: 14px;
+  }
+  .rc-summary .rc-stamps-value {
+    font-size: 22px;
   }
 }
