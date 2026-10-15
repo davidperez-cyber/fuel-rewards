@@ -103,7 +103,18 @@ function solidSvg(width: number, height: number, inner = ''): string {
   return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="${BLACK}"/>${panelArt(width, height)}${inner}</svg>`;
 }
 
-export async function generateStripPng(card: LoyaltyCard, width: number, height: number): Promise<Buffer> {
+/** Layout knobs, as fractions of the strip (stampH/rewardH/rowGap/gutter) or of the icon width (pitch). */
+export interface StripTune {
+  stampH: number; // shaker height / strip height
+  rowGap: number; // vertical gap between the two rows / strip height
+  pitch: number; // distance between shaker columns / shaker width
+  rewardH: number; // gold shaker height / strip height
+  gutter: number; // gap between the grid and the gold shaker / strip width
+  labelFont: number; // reward label font size / strip height
+}
+const TUNE: StripTune = { stampH: 0.36, rowGap: 0.07, pitch: 2.2, rewardH: 0.47, gutter: 0.085, labelFont: 0.08 };
+
+export async function generateStripPng(card: LoyaltyCard, width: number, height: number, tune: Partial<StripTune> = {}): Promise<Buffer> {
   const circles = buildCircles(card);
 
   if (circles.length === 0) {
@@ -116,31 +127,38 @@ export async function generateStripPng(card: LoyaltyCard, width: number, height:
 
   const aspect = await sharp(loadIcons().filled).metadata().then((m) => (m.width ?? 1) / (m.height ?? 1));
 
+  // Layout of the strip. Two rows of shakers, filled left-to-right then top-to-bottom, and the gold
+  // reward on its own to the right. The whole group (grid + gutter + reward) is centered in the strip.
+  const t = { ...TUNE, ...tune };
   const padX = width * 0.07;
   const padR = width * 0.095; // extra room on the right: the bottom-right streak must not touch the label
-  const padY = height * 0.07;
-
-  // Reward column (big gold shaker + label) on the right, on its own.
-  const rewardIconH = height * 0.68;
-  const rewardIconW = rewardIconH * aspect;
-  const rewardColW = rewardIconW + width * 0.05;
-  const rewardCx = width - padR - rewardIconW / 2;
-  const rewardTop = padY;
-  const labelCy = rewardTop + rewardIconH + (height - padY - (rewardTop + rewardIconH)) / 2;
-
-  // Stamp grid: 2 rows, filled left-to-right then top-to-bottom. The shakers are kept smaller than
-  // their cell and the columns close together, so each one has air around it; the block is centered
-  // in the space left of the reward column.
   const rows = 2;
   const cols = Math.ceil(stamps.length / rows);
-  const areaW = width - padX - padR - rewardColW;
-  const cellH = (height - padY * 2) / rows;
-  const stampIconH = Math.min(cellH * 0.74, ((areaW / cols) * 0.9) / aspect);
-  const cellW = Math.min(areaW / cols, stampIconH * aspect * 2.3);
-  const gridLeft = padX + (areaW - cellW * cols) / 2;
+
+  const rewardIconH = height * t.rewardH;
+  const rewardIconW = rewardIconH * aspect;
+  const labelFont = height * t.labelFont;
+  const labelGap = height * 0.03;
+  const labelH = labelFont * 0.75;
+  const rewardTop = (height - (rewardIconH + labelGap + labelH)) / 2;
+  const labelCy = rewardTop + rewardIconH + labelGap + labelH / 2;
+
+  const areaW = width - padX - padR;
+  const gutter = width * t.gutter;
+  const gridAreaW = areaW - gutter - rewardIconW;
+  // Many stamps (stage 2) are limited by the width of their column instead of the preferred height.
+  const stampIconH = Math.min(height * t.stampH, ((gridAreaW / cols) * 0.9) / aspect);
+  const stampIconW = stampIconH * aspect;
+  const pitch = Math.min(gridAreaW / cols, stampIconW * t.pitch);
+  const gridW = pitch * (cols - 1) + stampIconW;
+  const groupW = gridW + gutter + rewardIconW;
+  const gridLeft = padX + (areaW - groupW) / 2; // left edge of the first column's icon
+  const rewardCx = gridLeft + gridW + gutter + rewardIconW / 2;
+  const rowGap = height * t.rowGap;
+  const rowCy = (row: number) => height / 2 + (row - (rows - 1) / 2) * (stampIconH + rowGap);
 
   const labelSvg = reward
-    ? centeredTextGroup(reward.label, height * 0.1, rewardCx, labelCy, reward.filled ? GOLD : GOLD_DIM)
+    ? centeredTextGroup(reward.label, labelFont, rewardCx, labelCy, reward.filled ? GOLD : GOLD_DIM)
     : '';
   const base = await sharp(Buffer.from(solidSvg(width, height, labelSvg))).png().toBuffer();
 
@@ -155,9 +173,8 @@ export async function generateStripPng(card: LoyaltyCard, width: number, height:
     const col = i % cols;
     const row = Math.floor(i / cols);
     const icon = s.filled ? filledIcon : emptyIcon;
-    const cx = gridLeft + cellW * (col + 0.5);
-    const cy = padY + cellH * (row + 0.5);
-    return { input: icon.data, left: Math.round(cx - icon.info.width / 2), top: Math.round(cy - icon.info.height / 2) };
+    const cx = gridLeft + stampIconW / 2 + pitch * col;
+    return { input: icon.data, left: Math.round(cx - icon.info.width / 2), top: Math.round(rowCy(row) - icon.info.height / 2) };
   });
 
   if (reward) {
