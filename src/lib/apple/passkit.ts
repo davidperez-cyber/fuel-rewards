@@ -64,7 +64,7 @@ export function buildPassJson(card: LoyaltyCard, customer: Customer): Record<str
     // *next to* the logo image, so setting it here just duplicated "FUEL FUEL" on screen.
     backgroundColor: 'rgb(11,11,12)',
     foregroundColor: 'rgb(255,255,255)',
-    labelColor: 'rgb(154,154,154)',
+    labelColor: 'rgb(240,52,58)',
     // authenticationToken is only meaningful (and only valid per Apple's spec) alongside a real webServiceURL.
     ...(webServiceURL ? { webServiceURL, authenticationToken: card.authenticationToken } : {}),
     storeCard: {
@@ -132,9 +132,9 @@ export async function generatePkpassBuffer(card: LoyaltyCard, customer: Customer
 
   // Replace the static strip with one rendered fresh from the customer's real stamp progress.
   const [strip1x, strip2x, strip3x] = await Promise.all([
-    generateStripPng(card, 312, 125),
-    generateStripPng(card, 624, 250),
-    generateStripPng(card, 936, 375),
+    generateStripPng(card, 312, 120),
+    generateStripPng(card, 624, 240),
+    generateStripPng(card, 936, 360),
   ]);
   assets['strip.png'] = strip1x;
   assets['strip@2x.png'] = strip2x;

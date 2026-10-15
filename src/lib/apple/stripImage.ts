@@ -47,29 +47,60 @@ async function resizedIcon(name: IconName, height: number) {
 }
 
 /**
- * UFC-style red accents: hairlines along the top/bottom edges (they read as the separators of the
- * card) and a slanted slash in the top-left and bottom-right corners. Kept inside the margins so
- * they never touch the stamp icons or the reward label.
+ * The strip is the only canvas Wallet lets us fully design, so it carries the card's UFC look: a
+ * thin red rounded frame, gray planes + a red streak in two opposite corners (clipped to the frame,
+ * like the web card) and an octagon-cage mesh in the bottom-left corner. Everything stays in the
+ * margins around the stamp icons and the reward label.
  */
-function redAccents(width: number, height: number): string {
+function panelArt(width: number, height: number): string {
   const RED = '#e21c24';
-  const t = Math.max(1.5, height * 0.009);
-  const k = 2.2; // slash steepness (dy per dx)
-  const a = width * 0.054; // gray plane, along the corner
-  const r = width * 0.031; // thick red streak, right next to it
-  const g = width * 0.018; // second gray plane beyond the streak
-  // Top-left corner: gray plane, red streak, gray plane. Bottom-right is the same, rotated 180°.
+  const mx = width * 0.022;
+  const my = height * 0.05;
+  const fw = width - 2 * mx;
+  const fh = height - 2 * my;
+  const rx = height * 0.07;
+  const sw = Math.max(2, height * 0.009);
+
+  const k = 2.2; // streak steepness (dy per dx)
+  const a = fw * 0.056; // gray plane, along the corner
+  const r = fw * 0.032; // thick red streak, right next to it
+  const g = fw * 0.018; // second gray plane beyond the streak
+  const gap = fw * 0.004;
   const corner = [
     `<polygon points="0,0 ${a},0 0,${k * a}" fill="#2a2a2c"/>`,
-    `<polygon points="${a + r + width * 0.004},0 ${a + r + width * 0.004 + g},0 0,${k * (a + r + width * 0.004 + g)} 0,${k * (a + r + width * 0.004)}" fill="#19191a"/>`,
+    `<polygon points="${a + r + gap},0 ${a + r + gap + g},0 0,${k * (a + r + gap + g)} 0,${k * (a + r + gap)}" fill="#19191a"/>`,
     `<polygon points="${a},0 ${a + r},0 0,${k * (a + r)} 0,${k * a}" fill="${RED}"/>`,
   ].join('');
-  return `<rect width="${width}" height="${t}" fill="${RED}"/><rect y="${height - t}" width="${width}" height="${t}" fill="${RED}"/>
-    <g>${corner}</g><g transform="rotate(180 ${width / 2} ${height / 2})">${corner}</g>`;
+
+  // Cage mesh: a right triangle in the bottom-left corner with a lighter bevel along its diagonal.
+  const x0 = mx;
+  const yb = height - my;
+  const ch = fh * 0.3;
+  const step = Math.max(8, ch * 0.13);
+  const mesh: string[] = [];
+  for (let x = -ch; x <= ch; x += step) {
+    mesh.push(`<line x1="${x0 + x}" y1="${yb}" x2="${x0 + x + ch}" y2="${yb - ch}"/>`);
+    mesh.push(`<line x1="${x0 + x}" y1="${yb - ch}" x2="${x0 + x + ch}" y2="${yb}"/>`);
+  }
+  const tri = `${x0},${yb - ch} ${x0 + ch},${yb} ${x0},${yb}`;
+  const cage = `<polygon points="${tri}" fill="#151516"/>
+    <g clip-path="url(#cage)" stroke="#55555a" stroke-width="${Math.max(1, ch * 0.012)}" opacity="0.7">${mesh.join('')}</g>
+    <g clip-path="url(#cage)"><line x1="${x0}" y1="${yb - ch}" x2="${x0 + ch}" y2="${yb}" stroke="#2c2c2e" stroke-width="${ch * 0.2}"/></g>`;
+
+  return `<defs>
+      <clipPath id="panel"><rect x="${mx}" y="${my}" width="${fw}" height="${fh}" rx="${rx}"/></clipPath>
+      <clipPath id="cage"><polygon points="${tri}"/></clipPath>
+    </defs>
+    <g clip-path="url(#panel)">
+      <g transform="translate(${mx} ${my})">${corner}</g>
+      <g transform="rotate(180 ${width / 2} ${height / 2}) translate(${mx} ${my})">${corner}</g>
+      ${cage}
+    </g>
+    <rect x="${mx + sw / 2}" y="${my + sw / 2}" width="${fw - sw}" height="${fh - sw}" rx="${rx}" fill="none" stroke="${RED}" stroke-width="${sw}"/>`;
 }
 
 function solidSvg(width: number, height: number, inner = ''): string {
-  return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="${BLACK}"/>${redAccents(width, height)}${inner}</svg>`;
+  return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="${BLACK}"/>${panelArt(width, height)}${inner}</svg>`;
 }
 
 export async function generateStripPng(card: LoyaltyCard, width: number, height: number): Promise<Buffer> {
@@ -86,20 +117,21 @@ export async function generateStripPng(card: LoyaltyCard, width: number, height:
   const aspect = await sharp(loadIcons().filled).metadata().then((m) => (m.width ?? 1) / (m.height ?? 1));
 
   const padX = width * 0.07;
+  const padR = width * 0.095; // extra room on the right: the bottom-right streak must not touch the label
   const padY = height * 0.07;
 
   // Reward column (big gold shaker + label) on the right.
   const rewardIconH = height * 0.68;
   const rewardIconW = rewardIconH * aspect;
   const rewardColW = rewardIconW + width * 0.05;
-  const rewardCx = width - padX - rewardIconW / 2;
+  const rewardCx = width - padR - rewardIconW / 2;
   const rewardTop = padY;
   const labelCy = rewardTop + rewardIconH + (height - padY - (rewardTop + rewardIconH)) / 2;
 
   // Stamp grid: 2 rows, filled left-to-right then top-to-bottom, left of the reward column.
   const rows = 2;
   const cols = Math.ceil(stamps.length / rows);
-  const gridW = width - padX * 2 - rewardColW;
+  const gridW = width - padX - padR - rewardColW;
   const cellW = gridW / cols;
   const cellH = (height - padY * 2) / rows;
   const stampIconH = Math.min(cellH * 0.92, (cellW * 0.9) / aspect);
