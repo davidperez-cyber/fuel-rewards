@@ -116,28 +116,37 @@ export async function generateStripPng(card: LoyaltyCard, width: number, height:
 
   const aspect = await sharp(loadIcons().filled).metadata().then((m) => (m.width ?? 1) / (m.height ?? 1));
 
-  const padX = width * 0.07;
+  // Up to 6 stamps: one airy row (6 shakers, then the big gold one). More (stage 2): two rows.
+  const oneRow = stamps.length <= 6;
+  const padX = width * (oneRow ? 0.085 : 0.07);
   const padR = width * 0.095; // extra room on the right: the bottom-right streak must not touch the label
   const padY = height * 0.07;
 
   // Reward column (big gold shaker + label) on the right.
-  const rewardIconH = height * 0.68;
+  const rewardIconH = height * (oneRow ? 0.6 : 0.68);
   const rewardIconW = rewardIconH * aspect;
-  const rewardColW = rewardIconW + width * 0.05;
+  const rewardColW = rewardIconW + width * (oneRow ? 0.03 : 0.05);
   const rewardCx = width - padR - rewardIconW / 2;
-  const rewardTop = padY;
-  const labelCy = rewardTop + rewardIconH + (height - padY - (rewardTop + rewardIconH)) / 2;
+  const labelFont = height * 0.1;
+  // One row: icon + label are centered vertically as a block. Two rows: icon at the top.
+  const labelGap = height * 0.03;
+  const labelH = labelFont * 0.75;
+  const rewardTop = oneRow ? (height - (rewardIconH + labelGap + labelH)) / 2 : padY;
+  const labelCy = oneRow
+    ? rewardTop + rewardIconH + labelGap + labelH / 2
+    : rewardTop + rewardIconH + (height - padY - (rewardTop + rewardIconH)) / 2;
 
-  // Stamp grid: 2 rows, filled left-to-right then top-to-bottom, left of the reward column.
-  const rows = 2;
+  // Stamp grid, filled left-to-right (then top-to-bottom), left of the reward column.
+  const rows = oneRow ? 1 : 2;
   const cols = Math.ceil(stamps.length / rows);
   const gridW = width - padX - padR - rewardColW;
   const cellW = gridW / cols;
   const cellH = (height - padY * 2) / rows;
-  const stampIconH = Math.min(cellH * 0.92, (cellW * 0.9) / aspect);
+  const stampIconH = oneRow ? Math.min(height * 0.46, (cellW * 0.82) / aspect) : Math.min(cellH * 0.92, (cellW * 0.9) / aspect);
+  const rowCy = (row: number) => (oneRow ? rewardTop + rewardIconH / 2 : padY + cellH * (row + 0.5));
 
   const labelSvg = reward
-    ? centeredTextGroup(reward.label, height * 0.1, rewardCx, labelCy, reward.filled ? GOLD : GOLD_DIM)
+    ? centeredTextGroup(reward.label, labelFont, rewardCx, labelCy, reward.filled ? GOLD : GOLD_DIM)
     : '';
   const base = await sharp(Buffer.from(solidSvg(width, height, labelSvg))).png().toBuffer();
 
@@ -153,7 +162,7 @@ export async function generateStripPng(card: LoyaltyCard, width: number, height:
     const row = Math.floor(i / cols);
     const icon = s.filled ? filledIcon : emptyIcon;
     const cx = padX + cellW * (col + 0.5);
-    const cy = padY + cellH * (row + 0.5);
+    const cy = rowCy(row);
     return { input: icon.data, left: Math.round(cx - icon.info.width / 2), top: Math.round(cy - icon.info.height / 2) };
   });
 
