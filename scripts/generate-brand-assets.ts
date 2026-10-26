@@ -3,8 +3,8 @@ import path from 'path';
 import sharp from 'sharp';
 
 /**
- * Generates the Apple Wallet pass image assets (icon/strip, 1x/2x/3x; the logo comes from
- * generate-logo-from-reference.ts) from hand-written
+ * Generates the Apple Wallet pass image assets (strip, 1x/2x/3x; the logo comes from
+ * generate-logo-from-reference.ts and the icon from generate-pass-icon.ts) from hand-written
  * SVG, based on the brand reference in ../../scraps/pdf-page-1.png (black bg, red #e21c24,
  * gold #cda86a, "UFC GYM | FUEL" wordmark). Output goes to assets/apple-pass/ — tracked in git,
  * unlike secrets/ — so it ships with every deploy instead of falling back to placeholders.
@@ -14,19 +14,7 @@ const OUT_DIR = path.resolve(__dirname, '../assets/apple-pass');
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
 const BLACK = '#0b0b0c';
-const RED = '#e21c24';
 const GOLD = '#cda86a';
-
-function iconSvg(size: number): string {
-  const r = size * 0.5;
-  const ring = size * 0.36;
-  const dot = size * 0.13;
-  return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-    <rect width="${size}" height="${size}" fill="${BLACK}"/>
-    <circle cx="${r}" cy="${r}" r="${ring}" fill="none" stroke="${GOLD}" stroke-width="${size * 0.09}"/>
-    <circle cx="${r}" cy="${r}" r="${dot}" fill="${RED}"/>
-  </svg>`;
-}
 
 function stripSvg(width: number, height: number): string {
   const stripes: string[] = [];
@@ -52,10 +40,6 @@ interface Spec {
 }
 
 const SPECS: Spec[] = [
-  { filename: 'icon.png', width: 29, height: 29, svg: (w) => iconSvg(w) },
-  { filename: 'icon@2x.png', width: 58, height: 58, svg: (w) => iconSvg(w) },
-  { filename: 'icon@3x.png', width: 87, height: 87, svg: (w) => iconSvg(w) },
-
   { filename: 'strip.png', width: 312, height: 84, svg: stripSvg },
   { filename: 'strip@2x.png', width: 624, height: 168, svg: stripSvg },
   { filename: 'strip@3x.png', width: 936, height: 252, svg: stripSvg },
