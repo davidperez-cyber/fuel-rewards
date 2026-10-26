@@ -2,6 +2,7 @@ import { SignJWT, importPKCS8 } from 'jose';
 import { prisma } from '@/lib/db';
 import { ApiError } from '@/lib/api/errors';
 import { getCycleState } from '@/lib/loyalty/rules';
+import { walletNotificationText } from '@/lib/loyalty/notification';
 import { getGoogleWalletClient, isGoogleWalletConfigured } from './client';
 import { ensureLoyaltyClass } from './classes';
 
@@ -34,6 +35,8 @@ function buildObjectResource(client: NonNullable<ReturnType<typeof getGoogleWall
       alternateText: card.serialNumber,
     },
     textModulesData: [{ header: state.programTitle, body: state.progressText, id: 'status' }],
+    // Google keeps at most 10 messages per object: start each sync clean, then add the current one.
+    messages: [],
     // Only attach the hero image when the app is reachable over public HTTPS (Google must fetch it).
     ...(heroUrl.startsWith('https://')
       ? { heroImage: { sourceUri: { uri: heroUrl }, contentDescription: { defaultValue: { language: 'es-MX', value: 'Progreso de sellos' } } } }
@@ -42,7 +45,7 @@ function buildObjectResource(client: NonNullable<ReturnType<typeof getGoogleWall
 }
 
 /** Creates or updates the customer's Loyalty Object to reflect their current stamps/stage. No-op if Google Wallet isn't configured yet. */
-export async function syncGoogleObject(cardId: string): Promise<void> {
+export async function syncGoogleObject(cardId: string, opts: { notify?: boolean } = {}): Promise<void> {
   const client = getGoogleWalletClient();
   if (!client) return;
 
@@ -65,6 +68,20 @@ export async function syncGoogleObject(cardId: string): Promise<void> {
 
   if (card.googleObjectId !== resource.id) {
     await prisma.loyaltyCard.update({ where: { id: card.id }, data: { googleObjectId: resource.id } });
+  }
+
+  // "Your card changed" notification on the customer's Android (Google limits how many it delivers per day).
+  if (opts.notify) {
+    try {
+      await client.walletobjects.loyaltyobject.addmessage({
+        resourceId: resource.id,
+        requestBody: {
+          message: { header: 'UFC GYM FUEL', body: walletNotificationText(card), messageType: 'TEXT_AND_NOTIFY' },
+        },
+      });
+    } catch (err) {
+      console.error('Google Wallet notification failed', card.id, err);
+    }
   }
 }
 

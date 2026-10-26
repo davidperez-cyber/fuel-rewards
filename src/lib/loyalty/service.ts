@@ -44,7 +44,7 @@ async function afterCardChange(cardId: string) {
   });
   await Promise.allSettled([
     pushAppleUpdate(card.id).catch((err) => console.error('Apple push failed', cardId, err)),
-    syncGoogleObject(card.id).catch((err) => console.error('Google sync failed', cardId, err)),
+    syncGoogleObject(card.id, { notify: true }).catch((err) => console.error('Google sync failed', cardId, err)),
   ]);
   return card;
 }
