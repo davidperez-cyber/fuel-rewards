@@ -16,7 +16,7 @@ declare global {
   }
 }
 
-const MAX_DECODE_WIDTH = 640; // frames are downscaled before decoding: faster and just as readable
+const MAX_DECODE_WIDTH = 960; // frames are downscaled before decoding: faster and just as readable
 const DECODE_INTERVAL_MS = 120; // ~8 reads per second is plenty for a QR held up to the camera
 
 /**
@@ -29,6 +29,7 @@ export default function QrScanModal({ onDetected, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [manualValue, setManualValue] = useState('');
   const [showManual, setShowManual] = useState(false);
+  const [struggling, setStruggling] = useState(false);
 
   // Keep the latest callback in a ref: the camera must not restart every time the parent re-renders.
   const onDetectedRef = useRef(onDetected);
@@ -53,7 +54,7 @@ export default function QrScanModal({ onDetected, onClose }: Props) {
       }
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         });
       } catch {
@@ -75,24 +76,49 @@ export default function QrScanModal({ onDetected, onClose }: Props) {
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      const Native = window.BarcodeDetector;
-      const native = Native ? new Native({ formats: ['qr_code'] }) : null;
-      const jsQR = native ? null : (await import('jsqr')).default;
+      // Some browsers expose BarcodeDetector without QR support (or throw): then jsQR does the work.
+      let native: InstanceType<NonNullable<Window['BarcodeDetector']>> | null = null;
+      try {
+        const Native = window.BarcodeDetector as (Window['BarcodeDetector'] & { getSupportedFormats?: () => Promise<string[]> }) | undefined;
+        if (Native) {
+          const formats = (await Native.getSupportedFormats?.()) ?? ['qr_code'];
+          if (formats.includes('qr_code')) native = new Native({ formats: ['qr_code'] });
+        }
+      } catch {
+        native = null;
+      }
+      let jsQR: typeof import('jsqr').default | null = null;
+      try {
+        jsQR = (await import('jsqr')).default;
+      } catch {
+        if (!native) {
+          fail('No se pudo cargar el lector de códigos. Recarga la página o escribe el código a mano.');
+          return;
+        }
+      }
+      const startedAt = Date.now();
 
       const found = (value: string) => {
         if (stopped || !value) return;
         stopped = true;
+        navigator.vibrate?.(60);
         onDetectedRef.current(value);
       };
 
       const tick = async () => {
         if (stopped) return;
+        if (Date.now() - startedAt > 8000) setStruggling(true);
         try {
           if (video.readyState >= 2 && video.videoWidth > 0) {
             if (native) {
-              const codes = await native.detect(video);
-              if (codes.length > 0) return found(codes[0].rawValue);
-            } else if (jsQR && ctx) {
+              try {
+                const codes = await native.detect(video);
+                if (codes.length > 0) return found(codes[0].rawValue);
+              } catch {
+                // the native detector can fail on single frames: jsQR below still tries
+              }
+            }
+            if (jsQR && ctx) {
               const scale = Math.min(1, MAX_DECODE_WIDTH / video.videoWidth);
               canvas.width = Math.round(video.videoWidth * scale);
               canvas.height = Math.round(video.videoHeight * scale);
@@ -153,8 +179,10 @@ export default function QrScanModal({ onDetected, onClose }: Props) {
           autoPlay
         />
         {!error && (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
-            Apunta la cámara al QR de la tarjeta del cliente.
+          <div style={{ fontSize: 12, color: struggling ? 'var(--gold)' : 'var(--text-muted)', marginTop: 8 }}>
+            {struggling
+              ? 'No logro leerlo. Acerca el QR, súbele el brillo a la pantalla del cliente y evita reflejos; o escribe el código a mano.'
+              : 'Apunta la cámara al QR de la tarjeta del cliente.'}
           </div>
         )}
         {error && <div style={{ color: 'var(--red)', fontSize: 13 }}>{error}</div>}

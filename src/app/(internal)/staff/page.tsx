@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import CardPreview from '@/components/CardPreview';
 import QrScanModal from '@/components/QrScanModal';
 
@@ -28,7 +28,8 @@ export default function StaffPage() {
   const [query, setQuery] = useState('');
   const [customers, setCustomers] = useState<CustomerCard[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState<{ text: string; error: boolean } | null>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
 
@@ -45,9 +46,9 @@ export default function StaffPage() {
     return () => clearTimeout(t);
   }, [query, load]);
 
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(''), 2000);
+  function showToast(msg: string, error = false) {
+    setToast({ text: msg, error });
+    setTimeout(() => setToast(null), error ? 5000 : 3500);
   }
 
   async function runAction(id: string, path: 'stamp' | 'redeem' | 'reset', successMsg: string) {
@@ -59,7 +60,7 @@ export default function StaffPage() {
       setCustomers((prev) => prev.map((c) => (c.id === id ? data : c)));
       showToast(successMsg);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Error desconocido.');
+      showToast(err instanceof Error ? err.message : 'Error desconocido.', true);
     } finally {
       setBusy(false);
     }
@@ -76,9 +77,11 @@ export default function StaffPage() {
         return exists ? prev.map((c) => (c.id === data.id ? data : c)) : [data, ...prev];
       });
       setSelectedId(data.id);
-      showToast('Cliente encontrado.');
+      showToast(`Cliente encontrado: ${data.name}`);
+      // On a phone the detail panel sits below the list: bring it into view.
+      setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Código no reconocido.');
+      showToast(err instanceof Error ? err.message : 'Código no reconocido.', true);
     }
   }
 
@@ -129,7 +132,7 @@ export default function StaffPage() {
           })}
         </div>
 
-        <div className="panel" style={{ flex: '1 1 320px', minWidth: 0, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div ref={detailRef} className="panel" style={{ flex: '1 1 320px', minWidth: 0, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
           {!selected ? (
             <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>Selecciona un cliente de la lista.</div>
           ) : (
@@ -162,11 +165,35 @@ export default function StaffPage() {
                   </button>
                 )}
               </div>
-              {toast && <div style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 600 }}>{toast}</div>}
             </>
           )}
         </div>
       </div>
+
+      {toast && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            left: 16,
+            right: 16,
+            bottom: 24,
+            maxWidth: 440,
+            margin: '0 auto',
+            zIndex: 60,
+            padding: '14px 16px',
+            borderRadius: 12,
+            fontSize: 14,
+            fontWeight: 700,
+            textAlign: 'center',
+            color: '#fff',
+            background: toast.error ? 'var(--red)' : '#1f7a3f',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+          }}
+        >
+          {toast.text}
+        </div>
+      )}
 
       {scanning && <QrScanModal onDetected={handleScan} onClose={() => setScanning(false)} />}
     </div>
