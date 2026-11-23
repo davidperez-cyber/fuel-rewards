@@ -30,6 +30,8 @@ export default function StaffPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; error: boolean } | null>(null);
   const detailRef = useRef<HTMLDivElement>(null);
+  // Last customer stamped by a scan: guards against the same QR being read twice in a row.
+  const lastScanRef = useRef<{ id: string; at: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
 
@@ -77,9 +79,29 @@ export default function StaffPage() {
         return exists ? prev.map((c) => (c.id === data.id ? data : c)) : [data, ...prev];
       });
       setSelectedId(data.id);
-      showToast(`Cliente encontrado: ${data.name}`);
       // On a phone the detail panel sits below the list: bring it into view.
       setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+
+      // Scanning a card gives the stamp right away (the normal stamp rules still apply).
+      const last = lastScanRef.current;
+      if (last && last.id === data.id && Date.now() - last.at < 8000) {
+        showToast(`${data.name}: ya se le dio un sello hace un momento.`, true);
+        return;
+      }
+      setBusy(true);
+      try {
+        const stampRes = await fetch(`/api/customers/${data.id}/stamp`, { method: 'POST' });
+        const stamped = await stampRes.json();
+        if (!stampRes.ok) {
+          showToast(`${data.name}: ${stamped?.error?.message || 'No se pudo dar el sello.'}`, true);
+          return;
+        }
+        lastScanRef.current = { id: data.id, at: Date.now() };
+        setCustomers((prev) => prev.map((c) => (c.id === stamped.id ? stamped : c)));
+        showToast(`¡Sello agregado a ${data.name}! Lleva ${stamped.card.stampsLabel}`);
+      } finally {
+        setBusy(false);
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Código no reconocido.', true);
     }
@@ -98,7 +120,7 @@ export default function StaffPage() {
           placeholder="Buscar por nombre o teléfono"
         />
         <button className="btn btn-primary" onClick={() => setScanning(true)}>
-          Escanear código QR
+          Escanear QR y dar sello
         </button>
       </div>
 
