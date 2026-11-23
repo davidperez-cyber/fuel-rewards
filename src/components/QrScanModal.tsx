@@ -16,54 +16,112 @@ declare global {
   }
 }
 
+const MAX_DECODE_WIDTH = 640; // frames are downscaled before decoding: faster and just as readable
+const DECODE_INTERVAL_MS = 120; // ~8 reads per second is plenty for a QR held up to the camera
+
+/**
+ * Camera QR scanner. Uses the browser's native BarcodeDetector when it exists (Chrome on Android and
+ * desktop) and falls back to jsQR everywhere else — iPhone/iPad Safari and Chrome, Firefox, tablets —
+ * so it works on any device with a camera. Manual entry stays available if the camera can't be used.
+ */
 export default function QrScanModal({ onDetected, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [manualValue, setManualValue] = useState('');
-  const supported = typeof window !== 'undefined' && 'BarcodeDetector' in window;
+  const [showManual, setShowManual] = useState(false);
+
+  // Keep the latest callback in a ref: the camera must not restart every time the parent re-renders.
+  const onDetectedRef = useRef(onDetected);
+  useEffect(() => {
+    onDetectedRef.current = onDetected;
+  }, [onDetected]);
 
   useEffect(() => {
-    if (!supported) return;
     let stream: MediaStream | null = null;
-    let stop = false;
-    let rafId: number;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    function fail(message: string) {
+      setError(message);
+      setShowManual(true);
+    }
 
     async function start() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        if (!videoRef.current) return;
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-
-        const Detector = window.BarcodeDetector!;
-        const detector = new Detector({ formats: ['qr_code'] });
-
-        const tick = async () => {
-          if (stop || !videoRef.current) return;
-          try {
-            const codes = await detector.detect(videoRef.current);
-            if (codes.length > 0) {
-              onDetected(codes[0].rawValue);
-              return;
-            }
-          } catch {
-            // transient decode errors are expected between frames
-          }
-          rafId = requestAnimationFrame(tick);
-        };
-        rafId = requestAnimationFrame(tick);
-      } catch (err) {
-        setError('No se pudo acceder a la cámara. Revisa los permisos del navegador.');
+      if (!navigator.mediaDevices?.getUserMedia) {
+        fail('Este navegador no permite usar la cámara en esta página (hace falta abrirla con https). Escribe el código a mano.');
+        return;
       }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        });
+      } catch {
+        fail('No se pudo acceder a la cámara. Permite el acceso a la cámara en el navegador, o escribe el código a mano.');
+        return;
+      }
+      const video = videoRef.current;
+      if (stopped || !video) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      video.srcObject = stream;
+      try {
+        await video.play();
+      } catch {
+        fail('No se pudo iniciar la cámara. Escribe el código a mano.');
+        return;
+      }
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const Native = window.BarcodeDetector;
+      const native = Native ? new Native({ formats: ['qr_code'] }) : null;
+      const jsQR = native ? null : (await import('jsqr')).default;
+
+      const found = (value: string) => {
+        if (stopped || !value) return;
+        stopped = true;
+        onDetectedRef.current(value);
+      };
+
+      const tick = async () => {
+        if (stopped) return;
+        try {
+          if (video.readyState >= 2 && video.videoWidth > 0) {
+            if (native) {
+              const codes = await native.detect(video);
+              if (codes.length > 0) return found(codes[0].rawValue);
+            } else if (jsQR && ctx) {
+              const scale = Math.min(1, MAX_DECODE_WIDTH / video.videoWidth);
+              canvas.width = Math.round(video.videoWidth * scale);
+              canvas.height = Math.round(video.videoHeight * scale);
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const result = jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
+              if (result?.data) return found(result.data);
+            }
+          }
+        } catch {
+          // transient decode errors are expected between frames
+        }
+        timer = setTimeout(tick, DECODE_INTERVAL_MS);
+      };
+      tick();
     }
 
     start();
     return () => {
-      stop = true;
-      if (rafId) cancelAnimationFrame(rafId);
+      stopped = true;
+      if (timer) clearTimeout(timer);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [supported, onDetected]);
+  }, []);
+
+  function submitManual() {
+    const value = manualValue.trim();
+    if (value) onDetectedRef.current(value);
+  }
 
   return (
     <div
@@ -82,27 +140,46 @@ export default function QrScanModal({ onDetected, onClose }: Props) {
       <div className="panel" style={{ padding: 22, maxWidth: 420, width: '100%' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
           <div className="font-display" style={{ fontSize: 16 }}>Escanear código QR</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+          <button onClick={onClose} aria-label="Cerrar" style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
             ✕
           </button>
         </div>
 
-        {supported ? (
-          <>
-            <video ref={videoRef} style={{ width: '100%', borderRadius: 10, background: '#000' }} muted playsInline />
-            {error && <div style={{ color: 'var(--red)', fontSize: 13, marginTop: 10 }}>{error}</div>}
-          </>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              Tu navegador no soporta el escaneo nativo de códigos QR (disponible en Chrome/Edge en Android y desktop). Pega el
-              código del pase manualmente:
-            </div>
-            <input className="input" value={manualValue} onChange={(e) => setManualValue(e.target.value)} placeholder="Código del pase" />
-            <button className="btn btn-primary" onClick={() => manualValue.trim() && onDetected(manualValue.trim())}>
+        <video
+          ref={videoRef}
+          style={{ width: '100%', borderRadius: 10, background: '#000', display: error ? 'none' : 'block' }}
+          muted
+          playsInline
+          autoPlay
+        />
+        {!error && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
+            Apunta la cámara al QR de la tarjeta del cliente.
+          </div>
+        )}
+        {error && <div style={{ color: 'var(--red)', fontSize: 13 }}>{error}</div>}
+
+        {showManual ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+            <input
+              className="input"
+              value={manualValue}
+              onChange={(e) => setManualValue(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitManual()}
+              placeholder="Código del pase"
+              autoFocus
+            />
+            <button className="btn btn-primary" onClick={submitManual}>
               Buscar
             </button>
           </div>
+        ) : (
+          <button
+            onClick={() => setShowManual(true)}
+            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, marginTop: 10, padding: 0, textDecoration: 'underline' }}
+          >
+            ¿No lee? Escribir el código a mano
+          </button>
         )}
       </div>
     </div>
