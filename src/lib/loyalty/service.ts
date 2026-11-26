@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { ApiError } from '@/lib/api/errors';
-import { canAddStamp, canRedeem, getCycleState } from './rules';
+import { canAddStamp, canRedeem, getCycleState, isCardExpired } from './rules';
 import { pushAppleUpdate } from '@/lib/apple/push';
 import { syncGoogleObject } from '@/lib/google/wallet';
 import type { LoyaltyCard } from '@prisma/client';
@@ -66,10 +66,32 @@ export async function addStamp(customerId: string, staffUserId?: string) {
   if (!check.ok) {
     const messages: Record<string, string> = {
       COMPLETED: 'El ciclo de este cliente está completo. Reinicia el ciclo antes de agregar sellos.',
-      EXPIRED: 'Los sellos de este cliente vencieron. Reinicia el ciclo antes de continuar.',
+      EXPIRED: 'Los sellos de este cliente vencieron.',
       REWARD_PENDING: 'El cliente ya alcanzó el tope de sellos. Canjea su premio antes de agregar más.',
     };
     throw new ApiError(409, `STAMP_REJECTED_${check.reason}`, messages[check.reason]);
+  }
+
+  const now = new Date();
+  if (isCardExpired(card, now)) {
+    // The stamp window ran out: the old cycle is discarded and this stamp is the first of a new one.
+    await prisma.$transaction([
+      prisma.loyaltyCard.update({
+        where: { id: card.id },
+        data: {
+          stamps: 1,
+          stage: 'STAGE_1',
+          reward1ClaimedAt: null,
+          reward2ClaimedAt: null,
+          firstStampAt: now,
+          cycleStartedAt: now,
+          cycleNumber: { increment: 1 },
+        },
+      }),
+      prisma.cycleResetEvent.create({ data: { cardId: card.id, staffUserId } }),
+      prisma.stampEvent.create({ data: { cardId: card.id, staffUserId } }),
+    ]);
+    return afterCardChange(card.id);
   }
 
   await prisma.$transaction([
@@ -77,7 +99,7 @@ export async function addStamp(customerId: string, staffUserId?: string) {
       where: { id: card.id },
       data: {
         stamps: { increment: 1 },
-        firstStampAt: card.firstStampAt ?? new Date(),
+        firstStampAt: card.firstStampAt ?? now,
       },
     }),
     prisma.stampEvent.create({
@@ -95,7 +117,7 @@ export async function redeemReward(customerId: string, staffUserId?: string) {
   if (!check.ok) {
     const messages: Record<string, string> = {
       COMPLETED: 'El ciclo de este cliente ya está completo.',
-      EXPIRED: 'Los sellos de este cliente vencieron. Reinicia el ciclo antes de continuar.',
+      EXPIRED: 'Los sellos de este cliente vencieron; su tarjeta empieza un ciclo nuevo con el próximo sello.',
       NOT_READY: 'El cliente todavía no alcanza la meta para canjear un premio.',
     };
     throw new ApiError(409, `REDEEM_REJECTED_${check.reason}`, messages[check.reason]);
@@ -122,8 +144,8 @@ export async function redeemReward(customerId: string, staffUserId?: string) {
 export async function resetCycle(customerId: string, staffUserId?: string) {
   const card = notFoundIfMissing(await prisma.loyaltyCard.findUnique({ where: { customerId } }));
 
-  if (card.stage !== 'COMPLETED') {
-    throw new ApiError(409, 'RESET_NOT_ALLOWED', 'Solo se puede reiniciar el ciclo cuando está completo.');
+  if (card.stage !== 'COMPLETED' && !isCardExpired(card)) {
+    throw new ApiError(409, 'RESET_NOT_ALLOWED', 'Solo se puede reiniciar el ciclo cuando está completo o sus sellos vencieron.');
   }
 
   await prisma.$transaction([

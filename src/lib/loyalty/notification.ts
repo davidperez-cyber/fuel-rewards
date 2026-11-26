@@ -10,7 +10,7 @@ export function walletNotificationText(card: CardLike & { cycleNumber?: number }
   const s = getCycleState(card);
 
   if (s.stage === 'COMPLETED') return '¡Ciclo completado! Gracias por ser parte de UFC GYM FUEL.';
-  if (s.isExpired) return 'Tus sellos vencieron. Pide al staff reiniciar tu ciclo.';
+  if (s.previousCycleExpired) return 'Tus sellos vencieron. Tu tarjeta empezó un ciclo nuevo.';
 
   if (s.stage === 'STAGE_1') {
     if (s.stamps === 0) {

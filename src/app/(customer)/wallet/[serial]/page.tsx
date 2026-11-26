@@ -50,8 +50,8 @@ export default async function WalletCardPage({
             Un sello por cada Protein Shake pagado. El shake de cortesía no acumula sello. Válido durante los primeros{' '}
             {stampWindowDays()} días desde tu primer sello.
           </InfoLine>
-          {state.isExpired && (
-            <InfoLine>Tus sellos vencieron. Pide al staff que reinicie tu ciclo en tu próxima visita.</InfoLine>
+          {state.previousCycleExpired && (
+            <InfoLine>Tus sellos anteriores vencieron, así que tu tarjeta empezó un ciclo nuevo. Tu próximo shake cuenta como el primer sello.</InfoLine>
           )}
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', paddingTop: 6 }}>

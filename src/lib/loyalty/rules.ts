@@ -27,6 +27,8 @@ export interface CycleState {
   rewardReady: boolean;
   rewardType: 'FREE_SHAKE' | 'SHAKER' | null;
   isExpired: boolean;
+  /** The previous cycle expired and this state is its automatic restart. */
+  previousCycleExpired: boolean;
   expiresAt: Date | null;
   daysRemaining: number | null;
   programTitle: string;
@@ -53,10 +55,21 @@ export function isCardExpired(card: CardLike, now = new Date(), windowDays = sta
   return now.getTime() > expiresAt.getTime();
 }
 
-export function getCycleState(card: CardLike, now = new Date()): CycleState {
+/**
+ * Expired cycles restart automatically: once the stamp window has passed, the card is shown and
+ * treated as a fresh, empty cycle (the next stamp writes the reset to the database, see addStamp).
+ */
+export function effectiveCard<T extends CardLike>(card: T, now = new Date()): T {
+  if (!isCardExpired(card, now)) return card;
+  return { ...card, stamps: 0, stage: 'STAGE_1', reward1ClaimedAt: null, reward2ClaimedAt: null, firstStampAt: null };
+}
+
+export function getCycleState(rawCard: CardLike, now = new Date()): CycleState {
+  const previousCycleExpired = isCardExpired(rawCard, now);
+  const card = effectiveCard(rawCard, now);
   const windowDays = stampWindowDays();
   const expiresAt = computeExpiresAt(card.firstStampAt, windowDays);
-  const isExpired = isCardExpired(card, now, windowDays);
+  const isExpired = false; // an expired cycle has already been replaced by a fresh one above
   const daysRemaining = expiresAt
     ? Math.max(0, Math.ceil((expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)))
     : null;
@@ -69,6 +82,7 @@ export function getCycleState(card: CardLike, now = new Date()): CycleState {
       rewardReady: false,
       rewardType: null,
       isExpired: false,
+      previousCycleExpired,
       expiresAt,
       daysRemaining: null,
       programTitle: '¡Ciclo completado!',
@@ -87,15 +101,12 @@ export function getCycleState(card: CardLike, now = new Date()): CycleState {
       rewardReady,
       rewardType: 'SHAKER',
       isExpired,
+      previousCycleExpired,
       expiresAt,
       daysRemaining,
       programTitle: 'Camino al Shaker',
       programSub: 'Compra 15 protein shakes y recibe 1 shaker',
-      progressText: isExpired
-        ? 'Sellos vencidos — pide al staff reiniciar tu ciclo'
-        : rewardReady
-          ? '¡Shaker disponible!'
-          : `${STAGE_2_GOAL - card.stamps} para tu shaker`,
+      progressText: rewardReady ? '¡Shaker disponible!' : `${STAGE_2_GOAL - card.stamps} para tu shaker`,
       stampsLabel: `${card.stamps}/${STAGE_2_GOAL}`,
     };
   }
@@ -109,14 +120,15 @@ export function getCycleState(card: CardLike, now = new Date()): CycleState {
     rewardReady,
     rewardType: 'FREE_SHAKE',
     isExpired,
+    previousCycleExpired,
     expiresAt,
     daysRemaining,
     programTitle: 'Protein Shake Rewards',
     programSub: 'Compra 6 y el 7° es gratis',
-    progressText: isExpired
-      ? 'Sellos vencidos — pide al staff reiniciar tu ciclo'
-      : rewardReady
-        ? '¡Premio disponible!'
+    progressText: rewardReady
+      ? '¡Premio disponible!'
+      : previousCycleExpired
+        ? `Tus sellos vencieron: ciclo nuevo, ${STAGE_1_GOAL} para tu shake gratis`
         : `${STAGE_1_GOAL - card.stamps} para tu shake gratis`,
     stampsLabel: `${card.stamps}/${STAGE_1_GOAL}`,
   };
@@ -125,8 +137,8 @@ export function getCycleState(card: CardLike, now = new Date()): CycleState {
 export type StampRejectionReason = 'COMPLETED' | 'EXPIRED' | 'REWARD_PENDING';
 
 export function canAddStamp(card: CardLike, now = new Date()): { ok: true } | { ok: false; reason: StampRejectionReason } {
+  if (isCardExpired(card, now)) return { ok: true }; // starts a new cycle (see addStamp)
   if (card.stage === 'COMPLETED') return { ok: false, reason: 'COMPLETED' };
-  if (isCardExpired(card, now)) return { ok: false, reason: 'EXPIRED' };
   const state = getCycleState(card, now);
   if (state.rewardReady) return { ok: false, reason: 'REWARD_PENDING' };
   return { ok: true };
@@ -143,7 +155,8 @@ export function canRedeem(card: CardLike, now = new Date()): { ok: true } | { ok
 }
 
 /** Builds the circle-grid representation used by the card view / pass preview (mirrors buildTierInfo in the prototype). */
-export function buildCircles(card: CardLike): Array<{ key: string; label: string; filled: boolean; kind: 'stamp' | 'reward' }> {
+export function buildCircles(rawCard: CardLike): Array<{ key: string; label: string; filled: boolean; kind: 'stamp' | 'reward' }> {
+  const card = effectiveCard(rawCard);
   const state = getCycleState(card);
   if (state.stage === 'COMPLETED') return [];
   if (state.stage === 'STAGE_1') {
