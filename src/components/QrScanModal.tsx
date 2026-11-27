@@ -20,6 +20,44 @@ const MAX_DECODE_WIDTH = 960; // frames are downscaled before decoding: faster a
 const DECODE_INTERVAL_MS = 120; // ~8 reads per second is plenty for a QR held up to the camera
 
 /**
+ * Opens the camera. Phones get the rear camera; computers simply use their webcam (`ideal` never fails
+ * on its own). Some webcams/drivers still reject the size hints, so retry with the plainest request.
+ */
+async function openCamera(): Promise<MediaStream> {
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    });
+  } catch (err) {
+    const name = (err as { name?: string })?.name;
+    if (name === 'NotAllowedError' || name === 'SecurityError' || name === 'NotFoundError') throw err;
+    return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+  }
+}
+
+/** Explains, per browser error, why the camera didn't open and what to do about it. */
+function cameraErrorMessage(err: unknown): string {
+  const name = (err as { name?: string })?.name;
+  switch (name) {
+    case 'NotAllowedError':
+    case 'SecurityError':
+    case 'PermissionDeniedError':
+      return 'El navegador o Windows bloqueó la cámara. 1) Da clic en el ícono junto a la dirección de la página (candado o cámara), pon Cámara en "Permitir" y presiona Reintentar. 2) Si sigue igual, en Windows abre Configuración > Privacidad y seguridad > Cámara y activa "Acceso a la cámara" y "Permitir que las aplicaciones de escritorio accedan a la cámara".';
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+    case 'OverconstrainedError':
+      return 'No se encontró ninguna cámara en este equipo. Conecta una webcam y presiona Reintentar, o escribe el código a mano.';
+    case 'NotReadableError':
+    case 'TrackStartError':
+    case 'AbortError':
+      return 'La cámara está ocupada por otra aplicación (Teams, Zoom, la app Cámara, otra pestaña). Ciérrala y presiona Reintentar.';
+    default:
+      return `No se pudo abrir la cámara${name ? ` (${name})` : ''}. Presiona Reintentar o escribe el código a mano.`;
+  }
+}
+
+/**
  * Camera QR scanner. Uses the browser's native BarcodeDetector when it exists (Chrome on Android and
  * desktop) and falls back to jsQR everywhere else — iPhone/iPad Safari and Chrome, Firefox, tablets —
  * so it works on any device with a camera. Manual entry stays available if the camera can't be used.
@@ -30,6 +68,7 @@ export default function QrScanModal({ onDetected, onClose }: Props) {
   const [manualValue, setManualValue] = useState('');
   const [showManual, setShowManual] = useState(false);
   const [struggling, setStruggling] = useState(false);
+  const [attempt, setAttempt] = useState(0); // bumping it restarts the camera ("Reintentar")
 
   // Keep the latest callback in a ref: the camera must not restart every time the parent re-renders.
   const onDetectedRef = useRef(onDetected);
@@ -42,6 +81,9 @@ export default function QrScanModal({ onDetected, onClose }: Props) {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
+    setError(null);
+    setStruggling(false);
+
     function fail(message: string) {
       setError(message);
       setShowManual(true);
@@ -53,12 +95,9 @@ export default function QrScanModal({ onDetected, onClose }: Props) {
         return;
       }
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
-      } catch {
-        fail('No se pudo acceder a la cámara. Permite el acceso a la cámara en el navegador, o escribe el código a mano.');
+        stream = await openCamera();
+      } catch (err) {
+        fail(cameraErrorMessage(err));
         return;
       }
       const video = videoRef.current;
@@ -142,7 +181,7 @@ export default function QrScanModal({ onDetected, onClose }: Props) {
       if (timer) clearTimeout(timer);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, []);
+  }, [attempt]);
 
   function submitManual() {
     const value = manualValue.trim();
@@ -185,7 +224,14 @@ export default function QrScanModal({ onDetected, onClose }: Props) {
               : 'Apunta la cámara al QR de la tarjeta del cliente.'}
           </div>
         )}
-        {error && <div style={{ color: 'var(--red)', fontSize: 13 }}>{error}</div>}
+        {error && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ color: 'var(--red)', fontSize: 13, lineHeight: 1.45 }}>{error}</div>
+            <button className="btn btn-outline" onClick={() => setAttempt((n) => n + 1)}>
+              Reintentar
+            </button>
+          </div>
+        )}
 
         {showManual ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
