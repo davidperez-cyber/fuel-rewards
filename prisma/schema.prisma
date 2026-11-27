@@ -60,6 +60,10 @@ model LoyaltyCard {
   passUpdatedAt        DateTime @default(now()) // bumped whenever pass content changes, drives APNs push
   googleObjectId       String? @unique
 
+  // Last message an admin sent to this card's Wallet pass. Shown (and notified) as the pass's "Novedades"
+  // until the card itself changes again; cleared on the next stamp/redeem/reset.
+  walletMessage String?
+
   stampEvents      StampEvent[]
   redemptionEvents RedemptionEvent[]
   resetEvents      CycleResetEvent[]
@@ -127,4 +131,18 @@ model StaffUser {
   stampEvents      StampEvent[]
   redemptionEvents RedemptionEvent[]
   resetEvents      CycleResetEvent[]
+  broadcasts       WalletBroadcast[]
+}
+
+// A message an admin sent to a group of customers' Wallet passes (history of the "Mensajes" section).
+model WalletBroadcast {
+  id           String     @id @default(cuid())
+  message      String
+  audience     String // human-readable description of who it went to
+  recipients   Int // customers selected
+  appleDevices Int        @default(0) // iPhones notified
+  googleCards  Int        @default(0) // Google Wallet cards notified
+  staffUserId  String?
+  staffUser    StaffUser? @relation(fields: [staffUserId], references: [id])
+  createdAt    DateTime   @default(now())
 }

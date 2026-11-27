@@ -31,6 +31,7 @@ export default function StaffNav() {
   const tabs = [
     { href: '/staff', label: 'Staff', show: true },
     { href: '/admin', label: 'Admin', show: me?.role === 'ADMIN' },
+    { href: '/mensajes', label: 'Mensajes', show: me?.role === 'ADMIN' },
   ].filter((t) => t.show);
 
   return (

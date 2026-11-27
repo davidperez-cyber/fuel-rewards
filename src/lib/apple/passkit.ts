@@ -36,7 +36,8 @@ export function buildPassJson(card: LoyaltyCard, customer: Customer): Record<str
   const backFields: Array<Record<string, string>> = [
     // Whenever the card changes this text changes too, and Wallet shows it as a notification
     // ("%@" is replaced by the field's new value) after the APNs push makes it refetch the pass.
-    { key: 'news', label: 'Novedades', value: walletNotificationText(card), changeMessage: '%@' },
+    // A message an admin sent from Admin → Mensajes takes this spot until the card changes again.
+    { key: 'news', label: 'Novedades', value: card.walletMessage || walletNotificationText(card), changeMessage: '%@' },
     {
       key: 'rules',
       label: 'Reglas del programa',

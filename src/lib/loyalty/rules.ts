@@ -39,8 +39,8 @@ export interface CycleState {
 
 export function stampWindowDays(): number {
   const raw = process.env.STAMP_WINDOW_DAYS;
-  const n = raw ? parseInt(raw, 10) : 15;
-  return Number.isFinite(n) && n > 0 ? n : 15;
+  const n = raw ? parseInt(raw, 10) : 30;
+  return Number.isFinite(n) && n > 0 ? n : 30;
 }
 
 export function computeExpiresAt(firstStampAt: Date | null, windowDays = stampWindowDays()): Date | null {

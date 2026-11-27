@@ -71,8 +71,8 @@ y tamaños; el sistema los usará sin más cambios de código.
 Ver [`src/lib/loyalty/rules.ts`](src/lib/loyalty/rules.ts) — replica exactamente `README.md` del handoff:
 - Etapa 1: 6 sellos → 7° gratis (no otorga sello).
 - Etapa 2: al canjear el premio de etapa 1, continúa acumulando hasta 14 sellos adicionales (15 compras totales) → shaker.
-- Vigencia de sellos: `STAMP_WINDOW_DAYS` días desde el primer sello del ciclo (default 15). Al vencer, el staff debe
-  reiniciar el ciclo manualmente antes de seguir agregando sellos (no se borra el historial automáticamente).
+- Vigencia de sellos: `STAMP_WINDOW_DAYS` días desde el primer sello del ciclo (default 30). Al vencer, el ciclo se
+  reinicia automáticamente: el siguiente sello cuenta como el primero del ciclo nuevo (el historial se conserva).
 - "Reiniciar ciclo" solo disponible cuando el ciclo está completo (ambos premios canjeados), igual que el prototipo.
 
 ## Notas de diseño pendientes de confirmar con negocio

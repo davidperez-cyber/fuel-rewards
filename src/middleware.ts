@@ -26,7 +26,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (pathname.startsWith('/admin') && role !== 'ADMIN') {
+  if ((pathname.startsWith('/admin') || pathname.startsWith('/mensajes')) && role !== 'ADMIN') {
     const url = req.nextUrl.clone();
     url.pathname = role ? '/staff' : '/login';
     if (!role) url.searchParams.set('next', pathname);
@@ -37,5 +37,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/staff/:path*', '/admin/:path*'],
+  matcher: ['/staff/:path*', '/admin/:path*', '/mensajes/:path*'],
 };

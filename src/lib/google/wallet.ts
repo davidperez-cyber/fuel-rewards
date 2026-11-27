@@ -85,6 +85,27 @@ export async function syncGoogleObject(cardId: string, opts: { notify?: boolean 
   }
 }
 
+/**
+ * Sends an admin-written message to one card in Google Wallet, with a phone notification. Returns false
+ * when the card has no Google Wallet object. Google keeps at most 10 messages per object (and delivers
+ * only ~3 notifications per object per day), so old messages are trimmed first.
+ */
+export async function sendGoogleWalletMessage(googleObjectId: string | null, body: string): Promise<boolean> {
+  const client = getGoogleWalletClient();
+  if (!client || !googleObjectId) return false;
+
+  const { data } = await client.walletobjects.loyaltyobject.get({ resourceId: googleObjectId });
+  const existing = data.messages ?? [];
+  if (existing.length >= 9) {
+    await client.walletobjects.loyaltyobject.patch({ resourceId: googleObjectId, requestBody: { messages: existing.slice(-5) } });
+  }
+  await client.walletobjects.loyaltyobject.addmessage({
+    resourceId: googleObjectId,
+    requestBody: { message: { header: 'UFC GYM FUEL', body, messageType: 'TEXT_AND_NOTIFY' } },
+  });
+  return true;
+}
+
 /** Builds the "Add to Google Wallet" save URL (a JWT signed with the issuer's service account key). */
 export async function generateGoogleSaveLink(cardId: string): Promise<string> {
   const client = getGoogleWalletClient();

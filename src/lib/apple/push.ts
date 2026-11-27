@@ -23,9 +23,10 @@ function getProvider(): apn.Provider {
  * per the PassKit Web Service flow: the notification carries no payload, it just tells
  * the device to call GET /v1/passes/{passTypeIdentifier}/{serialNumber} again.
  */
-export async function pushAppleUpdate(cardId: string): Promise<void> {
+/** Returns how many devices APNs accepted the push for. */
+export async function pushAppleUpdate(cardId: string): Promise<number> {
   const registrations = await prisma.appleDeviceRegistration.findMany({ where: { cardId } });
-  if (registrations.length === 0) return;
+  if (registrations.length === 0) return 0;
 
   const passTypeIdentifier = process.env.APPLE_PASS_TYPE_IDENTIFIER;
   if (!passTypeIdentifier) throw new Error('Missing APPLE_PASS_TYPE_IDENTIFIER env var.');
@@ -51,4 +52,5 @@ export async function pushAppleUpdate(cardId: string): Promise<void> {
       where: { cardId, pushToken: { in: Array.from(staleTokens) } },
     });
   }
+  return result.sent.length;
 }

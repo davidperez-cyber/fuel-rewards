@@ -16,7 +16,7 @@ env:
       - BUILD
       - RUNTIME
   - variable: STAMP_WINDOW_DAYS
-    value: "15"
+    value: "30"
     availability:
       - BUILD
       - RUNTIME

@@ -40,7 +40,8 @@ export async function registerCustomer(input: RegisterCustomerInput) {
 async function afterCardChange(cardId: string) {
   const card = await prisma.loyaltyCard.update({
     where: { id: cardId },
-    data: { passUpdatedAt: new Date() },
+    // The card changed: its own news replaces any admin message on the pass.
+    data: { passUpdatedAt: new Date(), walletMessage: null },
   });
   await Promise.allSettled([
     pushAppleUpdate(card.id).catch((err) => console.error('Apple push failed', cardId, err)),
