@@ -34,3 +34,17 @@ export const sendBroadcastSchema = z.object({
   audience: broadcastAudienceSchema,
   customerIds: z.array(z.string().min(1)).min(1, 'Selecciona al menos un cliente.').max(5000),
 });
+
+const staffPassword = z.string().min(10, 'La contraseña debe tener al menos 10 caracteres.').max(200);
+
+export const createStaffSchema = z.object({
+  name: z.string().trim().min(2, 'Escribe el nombre.').max(120),
+  email: z.string().trim().toLowerCase().email('Correo inválido.'),
+  role: z.enum(['STAFF', 'ADMIN']),
+  password: staffPassword,
+});
+
+export const updateStaffSchema = z.object({
+  password: staffPassword.optional(),
+  role: z.enum(['STAFF', 'ADMIN']).optional(),
+});
